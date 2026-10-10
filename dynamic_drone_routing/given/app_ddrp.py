@@ -419,6 +419,10 @@ else:
         t = float(report["makespan"]) if report["makespan"] else workday
         show_full = st.sidebar.checkbox("Show full paths", value=True)
     else:
+        # Apply a deferred "jump to last step" (set by Play) BEFORE the slider
+        # is instantiated, so we never modify a widget key after its creation.
+        if st.session_state.pop("_goto_last", False):
+            st.session_state["step"] = n_steps - 1
         st.session_state["step"] = min(int(st.session_state.get("step", 0)), n_steps - 1)
         b1, b2, b3, b4 = st.sidebar.columns(4)
         if b1.button("First", help="First step"):
@@ -460,7 +464,8 @@ else:
             figure = figure_run(data, moment, show_full, workday=workday)
             frame.image(figure_png(figure), width=width)
             time.sleep(float(speed))
-        st.session_state["step"] = n_steps - 1
+        st.session_state["_goto_last"] = True  # applied at the top of the next run
+        st.rerun()
     else:
         st.image(figure_png(figure_run(data, t, show_full, workday=workday)),
                  width=display_width(data, max_height=max_h))
