@@ -23,6 +23,14 @@ from dynamic_drone_routing.given.generate_instances_ddrp import build as build_d
 from dynamic_drone_routing.given.simulator_ddrp import ReoptState, SimulationEnvironment
 from dynamic_drone_routing.random_search_ddrp import RandomSearchPolicy
 from multimodal_continuous_optimization import run_local
+from multimodal_continuous_optimization.autograder.ingestion import run_solver
+from multimodal_continuous_optimization.autograder.score import (
+    SEVERE_PENALTY,
+    normalized_error,
+)
+from multimodal_continuous_optimization.autograder.score import (
+    compute_scores as compute_mmco_scores,
+)
 from multimodal_continuous_optimization.given.generate_instances_mmco import build as build_mmco
 from multimodal_continuous_optimization.given.generate_instances_mmco import (
     validate as validate_mmco,
@@ -32,7 +40,11 @@ from multimodal_continuous_optimization.given.simulator_mmco import (
     SignalEnvironment,
 )
 from multimodal_continuous_optimization.hill_climbing_mmco import HillClimbingSolver
-from multimodal_continuous_optimization.student_mmco import BudgetExhausted, MySolver
+from multimodal_continuous_optimization.student_mmco import (
+    BaseSolver,
+    BudgetExhausted,
+    MySolver,
+)
 from wind_farm_layout_optimization import student_wflo
 from wind_farm_layout_optimization.autograder.score import compute_scores
 from wind_farm_layout_optimization.given.generate_instances_wflo import build as build_wflo
@@ -313,3 +325,50 @@ def test_mmco_run_local(tmp_path: Path) -> None:
     data = json.loads(out.read_text(encoding="utf-8"))
     assert data["solver"] == "hill_climbing"
     assert data["report"]["evaluations"] == report["budget"]
+
+
+# ===========================================================================
+# MMCO autograder
+# ===========================================================================
+def test_mmco_normalized_error() -> None:
+    assert normalized_error([0.0, 0.0], [0.0, 0.0], 2, [-1.0, 1.0]) == 0.0
+    assert normalized_error([-1.0, -1.0], [1.0, 1.0], 2, [-1.0, 1.0]) == 1.0
+    assert normalized_error(None, [0.0], 1, [0.0, 1.0]) == 1.0
+
+
+def test_mmco_ingestion_runs_honest_solver() -> None:
+    instance = build_mmco("toy", seed=0)
+    record = run_solver(instance, HillClimbingSolver, wall_limit=30, cpu_limit=30, seed=0)
+    assert record["valid"]
+    assert record["evaluations"] == instance.max_evaluations
+    assert len(record["best_x"]) == instance.dimension
+
+
+def test_mmco_ingestion_flags_budget_breaker() -> None:
+    class Breaker(BaseSolver):
+        name = "breaker"
+
+        def solve(self):
+            while True:  # ignores the budget and keeps hammering the black box
+                self.evaluate(self.propose())
+
+    instance = build_mmco("toy", seed=0)
+    record = run_solver(instance, Breaker, wall_limit=30, cpu_limit=30, seed=0)
+    assert not record["valid"]
+    assert record["budget_exceeded"]
+    assert "budget" in record["reason"]
+
+
+def test_mmco_scoring_distance_and_penalty() -> None:
+    predictions = {
+        "instances": {
+            "exact": {"valid": True, "best_x": [0.0, 0.0], "optimum": [0.0, 0.0],
+                      "dimension": 2, "bounds": [-1.0, 1.0]},
+            "cheat": {"valid": False, "best_x": None, "optimum": [0.0, 0.0],
+                      "dimension": 2, "bounds": [-1.0, 1.0], "reason": "timeout"},
+        }
+    }
+    score, per_instance = compute_mmco_scores(predictions, {})
+    assert per_instance["exact"] == 0.0
+    assert per_instance["cheat"] == SEVERE_PENALTY
+    assert score == SEVERE_PENALTY / 2

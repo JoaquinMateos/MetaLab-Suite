@@ -138,14 +138,15 @@ MetaLab Suite/
     ├── run_local.py               # terminal test harness
     ├── README.md                  # technical guide
     ├── instances/  solutions/     # data / your outputs (git-ignored)
-    └── given/                     # provided — do not edit
-        ├── simulator_mmco.py      #   environment engine (evaluation budget)
-        └── generate_instances_mmco.py
+    ├── given/                     # provided — do not edit
+    │   ├── simulator_mmco.py      #   environment engine (evaluation budget)
+    │   └── generate_instances_mmco.py
+    └── autograder/                # Codabench ingestion.py + score.py
 ```
 
 ### Anatomy of a problem folder
 
-Both problems follow a **“given vs. yours”** split and keep the folder root clean:
+Every problem follows a **“given vs. yours”** split and keeps the folder root clean:
 only *your* file, the random-search example, the data and the README live there;
 the provided tools and the autograder are tucked into subfolders.
 

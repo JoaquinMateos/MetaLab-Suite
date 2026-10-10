@@ -38,14 +38,14 @@ multimodal_continuous_optimization/
 ├── run_local.py                       # terminal test harness
 ├── instances/                         # toy.json, hard.json (git-ignored)
 ├── solutions/                         # your outputs (git-ignored)
-└── given/                             # provided — read, do not edit
-    ├── __init__.py
-    ├── simulator_mmco.py              # the environment engine (ground truth)
-    └── generate_instances_mmco.py     # builds the toy/hard terrains
+├── given/                             # provided — read, do not edit
+│   ├── __init__.py
+│   ├── simulator_mmco.py              # the environment engine (ground truth)
+│   └── generate_instances_mmco.py     # builds the toy/hard terrains
+└── autograder/                        # Codabench ingestion.py + score.py
 ```
 
-> Later phases add a Streamlit visualiser (`given/app_mmco.py`) and the
-> Codabench autograder (`autograder/`).
+> A Streamlit visualiser (`given/app_mmco.py`) is the remaining phase.
 
 ---
 
@@ -198,7 +198,36 @@ budget; `validate()` guarantees the terrain is well-posed.
 
 ---
 
-## 8. Instance schema (JSON)
+## 8. Autograder (Codabench backend)
+
+* **`autograder/ingestion.py`** runs the submitted solver against each terrain
+  and enforces the two hard limits: a **wall-clock timeout** and a **CPU-time
+  timeout** (`--time-limit` / `--cpu-limit`, via `signal.setitimer`) plus the
+  **evaluation budget** (enforced by the environment). A run that times out,
+  exceeds the budget or crashes is recorded as **invalid**.
+* **`autograder/score.py`** computes, for every terrain, the **normalised
+  distance** between the student's best coordinates and the **hidden optimum**
+  (`||best_x - optimum|| / (sqrt(n)·(upper-lower))`, lower is better) and
+  charges a **severe penalty** (`1e9`) for any invalid prediction. The score is
+  the mean over terrains.
+
+```bash
+uv run python -m multimodal_continuous_optimization.autograder.ingestion \
+    multimodal_continuous_optimization /tmp/mmco_out \
+    multimodal_continuous_optimization/hill_climbing_mmco.py --time-limit 60
+
+uv run python -m multimodal_continuous_optimization.autograder.score \
+    /tmp/mmco_out /tmp/mmco_scores
+```
+
+On Codabench the programs are invoked positionally as
+`python ingestion.py <input> <output> <submission>` and
+`python score.py <input> <output>`; ingestion writes `predictions.json` and
+scoring reads it (JSON, or legacy `predictions.txt`) and writes `scores.json`.
+
+---
+
+## 9. Instance schema (JSON)
 
 ```json
 {
@@ -215,7 +244,7 @@ budget; `validate()` guarantees the terrain is well-posed.
 
 ---
 
-## 9. Deliverables
+## 10. Deliverables
 
 1. `student_mmco.py` implementing **one population-based metaheuristic** that
    finds the optimum **within the budget**, using only `self.query(...)`.
