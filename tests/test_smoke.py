@@ -17,6 +17,9 @@ from wind_farm_layout_optimization.generator import generate as generate_wflo
 from wind_farm_layout_optimization.model import evaluate as evaluate_wflo
 from wind_farm_layout_optimization.model import random_layout
 from wind_farm_layout_optimization.solver import HillClimbingSolver
+from wind_farm_layout_optimization.starter import hill_climbing as starter_hill_climbing
+from wind_farm_layout_optimization.starter import model as starter_model
+from wind_farm_layout_optimization.starter import random_search as starter_random_search
 
 
 def test_wflo_instance_and_objective() -> None:
@@ -44,3 +47,22 @@ def test_ddrp_instance_and_solver() -> None:
     assert solution.diagnostics["served"] >= 1
     # The evaluation of the returned plan must match the reported cost.
     assert evaluate_ddrp(instance, solution.routes)["cost"] == solution.cost
+
+
+def test_starter_model_and_baseline() -> None:
+    instance = starter_model.Instance(name="t", m=4, n_turbines=6)
+    layout, optimum = starter_model.brute_force(instance)
+    assert optimum > 0
+    assert starter_model.evaluate(instance, layout)["total_power"] == optimum
+    _, baseline, _ = starter_random_search.random_search(instance, iterations=200, seed=0)
+    assert baseline <= optimum + 1e-9  # random search cannot beat the true optimum
+
+
+def test_starter_hill_climbing_is_a_skeleton() -> None:
+    instance = starter_model.Instance(name="t", m=4, n_turbines=6)
+    try:
+        starter_hill_climbing.hill_climb(instance, iterations=1, seed=0)
+    except NotImplementedError:
+        pass
+    else:  # pragma: no cover - only runs if a student forgot to add the exercise
+        raise AssertionError("the starter hill_climbing should raise NotImplementedError")

@@ -3,6 +3,10 @@
 > **MetaLab Suite · Problem #1**
 > A trajectory-based metaheuristic playground for micro-siting wind turbines.
 
+> **New to metaheuristics?** Start with the beginner edition in
+> [`starter/`](starter/README.md) — a simplified grid model where you implement
+> your very first hill climber.
+
 ---
 
 ## 1. Problem context

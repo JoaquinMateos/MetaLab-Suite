@@ -31,10 +31,32 @@ one lockfile, one virtual environment, many problems.
 | Folder | Problem | Objective | Baseline |
 | --- | --- | --- | --- |
 | [`wind_farm_layout_optimization/`](wind_farm_layout_optimization/README.md) | Wind Farm Layout Optimization (WFLO) | maximise AEP (GWh/yr) | stochastic hill climbing |
+| ↳ [`…/starter/`](wind_farm_layout_optimization/starter/README.md) | WFLO — **beginner edition** (grid + your first hill climber) | maximise expected power | random search |
 | [`dynamic_dial_a_ride/`](dynamic_dial_a_ride/README.md) | Dynamic Dial-a-Ride Problem (DDRP) | minimise travel + service cost | cheapest insertion |
 
 > More problems are added over time. Each new folder ships with its own
 > comprehensive `README.md` (see the suite rule below).
+
+### Documentation
+
+Each problem has its own standalone PDF in [`docs/`](docs/):
+
+| PDF | Level | Contents |
+| --- | --- | --- |
+| [`wind_farm_layout_optimization.pdf`](docs/wind_farm_layout_optimization.pdf) | beginner | the simplified grid model, why metaheuristics are needed, and a full hill-climbing walkthrough |
+| [`dynamic_drone_routing.pdf`](docs/dynamic_drone_routing.pdf) | advanced | the Dynamic Drone Routing Problem (Dorling et al., 2016): objective, capacity/battery constraints, rolling-horizon and tabu search |
+
+To rebuild the PDFs (needs a LaTeX distribution):
+
+```bash
+cd docs
+pdflatex wind_farm_layout_optimization.tex && pdflatex wind_farm_layout_optimization.tex
+pdflatex dynamic_drone_routing.tex          && pdflatex dynamic_drone_routing.tex
+```
+
+> The drone-routing theory document corresponds to problem `DDRP`; its
+> reference implementation folder is currently named `dynamic_dial_a_ride/`
+> (a rename to `dynamic_drone_routing/` is pending).
 
 ---
 
@@ -88,12 +110,19 @@ MetaLab Suite/
 ├── .python-version                # interpreter pin (3.12)
 ├── README.md                      # you are here
 ├── LICENSE                        # MIT
+├── docs/                          # one LaTeX source + PDF per problem
+│   ├── wind_farm_layout_optimization.tex/.pdf   # beginner edition
+│   └── dynamic_drone_routing.tex/.pdf           # advanced
 ├── src/
 │   └── metalab/                   # shared, problem-agnostic helpers
 │       ├── __init__.py
 │       └── trace.py               # ConvergenceTrace (convergence curves)
 ├── wind_farm_layout_optimization/ # Problem #1 (self-contained)
 │   ├── model.py  generator.py  solver.py  app.py  README.md
+│   ├── starter/                   # beginner edition (grid + hill-climber skeleton)
+│   │   ├── model.py  generate.py  random_search.py
+│   │   ├── hill_climbing.py       # ✏️ student task
+│   │   └── app.py  README.md
 │   ├── instances/                 # generated data (git-ignored)
 │   └── solutions/                 # solver output (git-ignored)
 └── dynamic_dial_a_ride/           # Problem #2 (self-contained)
