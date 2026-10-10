@@ -15,27 +15,12 @@
 \usepackage{booktabs}
 \usepackage{array}
 \usepackage{xcolor}
-\usepackage{listings}
 \usepackage{microtype}
 \usepackage[hidelinks]{hyperref}
 
 \newcommand{\R}{\mathbb{R}}
 \newcommand{\norm}[1]{\left\lVert #1 \right\rVert}
 \DeclareMathOperator*{\argmax}{arg\,max}
-
-\lstdefinestyle{py}{
-  language=Python,
-  basicstyle=\ttfamily\small,
-  keywordstyle=\color{blue!70!black},
-  commentstyle=\color{gray},
-  stringstyle=\color{green!45!black},
-  numbers=left,
-  numberstyle=\tiny\color{gray},
-  frame=single,
-  breaklines=true,
-  showstringspaces=false,
-  columns=fullflexible,
-}
 
 \title{%
   \textbf{Wind Farm Layout Optimization}\\[2mm]
@@ -84,8 +69,8 @@ You must implement \textbf{one trajectory-based metaheuristic} (simulated
 annealing, tabu search, iterated local search, \dots) that calls the provided
 simulator. You are expected to design the encoding, the neighbourhood and the
 acceptance rule yourselves. \textcolor{gray}{\emph{The only algorithm supplied
-is the random-search example of Section~\ref{sec:example}; the object-oriented
-skeleton is there for you to fill in.}}
+is a plain random search; the object-oriented skeleton is there for you to fill
+in, and the companion guide lists the tools.}}
 
 %==============================================================================
 \section{The model}
@@ -251,46 +236,6 @@ technical guide:} \texttt{wind\_farm\_layout\_optimization/README.md}.}}
 
 A layout is ``feasible'' when it satisfies (C1)--(C3); the simulator reports
 this for you, together with the objective and the efficiency.
-
-%==============================================================================
-\section{Starting point: random search}
-\label{sec:example}
-%==============================================================================
-
-The only algorithm supplied is a plain random search --- the weakest possible
-method. Use it to learn the interface; the real work is yours.
-
-\begin{lstlisting}[style=py,caption={The provided random-search example (object-oriented).}]
-class RandomSearchSolver(BaseWFLOSolver):
-    name = "random_search"
-
-    def solve(self, time_limit=None):
-        best_layout = self.env.random_layout(seed=self.seed)
-        best_value = self.score(best_layout)
-        self.record(best_value)
-        for _ in range(self.iterations):
-            layout = self.env.random_layout(seed=...)
-            value = self.score(layout)
-            if value > best_value:
-                best_layout, best_value = layout, value
-            self.record(best_value)
-        return best_layout
-\end{lstlisting}
-
-\noindent
-Following the same pattern, you implement \texttt{MySolver.solve} in
-\texttt{student\_wflo.py}: produce a candidate \texttt{layout}, score it with
-\texttt{self.score(layout)}, keep the best one, and call \texttt{self.record(...)}
-so the GUI can plot the convergence curve. The design of the move (neighbourhood)
-and of the acceptance rule is entirely up to you.
-
-\subsection*{Your skeleton (object-oriented)}
-
-\texttt{BaseWFLOSolver} is the abstract interface every solver must respect, and
-\texttt{MySolver} is an empty subclass with \texttt{TODO} markers. Implementing it
-means deciding, for instance, the initial solution (random or greedy), the
-perturbation that produces a neighbouring layout, and the acceptance rule (hill
-climbing, simulated annealing with a cooling schedule, tabu search, \dots).
 
 %==============================================================================
 \section{Deliverables}
