@@ -67,7 +67,7 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
 def main(argv: list[str] | None = None) -> None:
     args = parse_args(argv)
     env = WindFarmEnvironment.from_file(args.instance)
-    best_layout, best_value, _ = random_search(env, args.iterations, args.seed)
+    best_layout, best_value, history = random_search(env, args.iterations, args.seed)
 
     report = env.evaluate(best_layout)
     out = args.out or (DEFAULT_SOLUTIONS_DIR / f"{env.instance.name}_random.json")
@@ -75,10 +75,12 @@ def main(argv: list[str] | None = None) -> None:
     out.write_text(
         json.dumps(
             {
+                "solver": "random_search",
                 "instance": env.instance.name,
                 "algorithm": "random_search",
                 "objective": best_value,
                 "layout": best_layout,
+                "history": history,
                 "report": report,
             },
             indent=2,

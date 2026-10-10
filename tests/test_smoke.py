@@ -7,15 +7,20 @@ algorithmic errors.
 
 from __future__ import annotations
 
+from pathlib import Path
+
+import wind_farm_layout_optimization
 from dynamic_dial_a_ride.generator import generate as generate_ddrp
 from dynamic_dial_a_ride.model import evaluate as evaluate_ddrp
 from dynamic_dial_a_ride.solver import CheapestInsertionSolver
 from wind_farm_layout_optimization.example_random_search import random_search as wflo_random_search
 from wind_farm_layout_optimization.generate_instances_wflo import build as build_wflo
+from wind_farm_layout_optimization.score import compute_scores
 from wind_farm_layout_optimization.simulator_wflo import WindFarmEnvironment
 from wind_farm_layout_optimization.starter import hill_climbing as starter_hill_climbing
 from wind_farm_layout_optimization.starter import model as starter_model
 from wind_farm_layout_optimization.starter import random_search as starter_random_search
+from wind_farm_layout_optimization.student_wflo import GridSolver, run_solver_script
 
 
 # ---------------------------------------------------------------------------
@@ -65,6 +70,44 @@ def test_wflo_random_search_example_improves_history() -> None:
     assert len(history) == 50
     assert value == history[-1]
     assert env.evaluate(layout)["expected_power_mw"] == value
+
+
+# ---------------------------------------------------------------------------
+# WFLO student API + autograder
+# ---------------------------------------------------------------------------
+def test_grid_solver_is_feasible() -> None:
+    env = WindFarmEnvironment(build_wflo("toy", seed=0))
+    layout = GridSolver(env, seed=0).solve()
+    assert len(layout) == env.instance.n_turbines
+    assert env.is_feasible(layout)
+
+
+def test_run_solver_script_and_scoring(tmp_path: Path) -> None:
+    instance = tmp_path / "toy.json"
+    build_wflo("toy", seed=0).save(instance)
+    solver = Path(wind_farm_layout_optimization.__file__).parent / "student_wflo.py"
+
+    outcome = run_solver_script(
+        solver, instance, tmp_path / "layout.json", seed=0, wall_limit=60, cpu_limit=60
+    )
+    assert outcome["ok"], outcome["error"]
+    assert len(outcome["result"]["layout"]) == 10
+
+    feasible = {
+        "instances": {
+            "toy": {"feasible": True, "expected_power_mw": 5.0, "reference_power_mw": 10.0}
+        }
+    }
+    score, per_instance = compute_scores(feasible, {})
+    assert per_instance["toy"] == 0.5
+    assert score == 0.5
+
+    infeasible = {
+        "instances": {
+            "toy": {"feasible": False, "expected_power_mw": 9.0, "reference_power_mw": 10.0}
+        }
+    }
+    assert compute_scores(infeasible, {})[1]["toy"] == 0.0
 
 
 # ---------------------------------------------------------------------------
