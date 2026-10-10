@@ -1,0 +1,50 @@
+# --- Python ---------------------------------------------------------------
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+*.egg-info/
+.eggs/
+build/
+dist/
+wheels/
+
+# --- uv / virtual environments -------------------------------------------
+.venv/
+venv/
+.env
+.env.*
+!.env.example
+
+# --- Testing & coverage ---------------------------------------------------
+.pytest_cache/
+.ruff_cache/
+.coverage
+.coverage.*
+htmlcov/
+coverage.xml
+
+# --- Type checkers / editors ---------------------------------------------
+.mypy_cache/
+.dmypy.json
+.vscode/
+.idea/
+*.swp
+
+# --- Jupyter --------------------------------------------------------------
+.ipynb_checkpoints/
+
+# --- OS -------------------------------------------------------------------
+.DS_Store
+Thumbs.db
+
+# --- Project artifacts ----------------------------------------------------
+# Generated problem data. Keep the folders, ignore their contents.
+wind_farm_layout_optimization/instances/*.json
+wind_farm_layout_optimization/solutions/**
+dynamic_dial_a_ride/instances/*.json
+dynamic_dial_a_ride/solutions/**
+!**/.gitkeep
+
+# Streamlit local state
+.streamlit/secrets.toml
