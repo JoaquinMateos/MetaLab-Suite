@@ -193,12 +193,11 @@ class WindFarmEnvironment:
                 n_inside += 1
             if self.inside_exclusion(x, y):
                 n_exclusion += 1
-        for i in range(len(positions)):
-            for j in range(i + 1, len(positions)):
-                dx = positions[i][0] - positions[j][0]
-                dy = positions[i][1] - positions[j][1]
-                if math.hypot(dx, dy) < inst.min_spacing - 1e-9:
-                    spacing_violations += 1
+        if len(positions) >= 2:
+            pts = np.asarray(positions, dtype=float)
+            distances = np.linalg.norm(pts[:, None, :] - pts[None, :, :], axis=-1)
+            upper = np.triu_indices(len(positions), k=1)
+            spacing_violations = int((distances[upper] < inst.min_spacing - 1e-9).sum())
         size_ok = len(positions) == inst.n_turbines
         return {
             "feasible": bool(
@@ -214,9 +213,12 @@ class WindFarmEnvironment:
     def effective_speeds(
         self, layout: Sequence[Sequence[float]], wind_scenario: WindScenario
     ) -> np.ndarray:
-        """Wind speed (m/s) seen by each turbine under one scenario (Jensen model)."""
+        """Wind speed (m/s) seen by each turbine under one scenario (Jensen model).
+
+        Fully vectorised: the pairwise deficits depend only on the geometry (not
+        on the wind speed), so all ``delta_ij`` are computed at once.
+        """
         positions = np.asarray(layout, dtype=float)
-        n = len(positions)
         theta = math.radians(wind_scenario.direction_deg)
         along = np.array([math.cos(theta), math.sin(theta)])
         cross = np.array([-along[1], along[0]])
@@ -225,21 +227,15 @@ class WindFarmEnvironment:
         k = self.instance.turbine.wake_decay
         ct = self.instance.turbine.thrust_coefficient
 
-        order = np.argsort(positions @ along)  # upstream turbines first
-        deficits_sq = np.zeros(n)
-        for a in range(n):
-            i = order[a]
-            for b in range(a + 1, n):
-                j = order[b]
-                rel = positions[j] - positions[i]
-                x = float(rel @ along)  # downstream distance
-                if x <= 1e-9:
-                    continue
-                y = abs(float(rel @ cross))  # cross-wind offset
-                if y > d / 2.0 + k * x:  # outside the wake cone
-                    continue
-                delta = (1.0 - math.sqrt(max(1.0 - ct, 0.0))) * (d / (d + 2.0 * k * x)) ** 2
-                deficits_sq[j] += delta**2
+        # rel[i, j] = position_j - position_i
+        rel = positions[:, None, :] - positions[None, :, :]
+        x = rel @ along  # downstream distance (x[i, j] > 0  <=>  i upwind of j)
+        y = np.abs(rel @ cross)  # cross-wind offset
+
+        in_wake = (x > 1e-9) & (y <= d / 2.0 + k * x)
+        x_safe = np.where(in_wake, x, 1.0)
+        delta = (1.0 - math.sqrt(max(1.0 - ct, 0.0))) * (d / (d + 2.0 * k * x_safe)) ** 2
+        deficits_sq = np.where(in_wake, delta**2, 0.0).sum(axis=0)
 
         factor = np.clip(1.0 - np.sqrt(deficits_sq), 0.0, None)
         return wind_scenario.speed * factor

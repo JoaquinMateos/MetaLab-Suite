@@ -57,9 +57,10 @@ constraints, the simplified \emph{Jensen} wake model, the turbine power curve,
 and the objective function---the expected farm power. It is the \emph{theory};
 the technical instructions for generating instances and evaluating layouts are
 in the companion guide \texttt{wind\_farm\_layout\_optimization/README.md}.
-The simulator and the instance generator are provided; the
-\emph{metaheuristic is your task}. A single random-search example is included
-only to show the interface.
+The simulator, the instance generator and an interactive GUI are provided; the
+\emph{metaheuristic is your task}. A random-search example and a
+simulated-annealing starter kit are included only to show the interface and to
+give you a template to improve.
 \end{abstract}
 
 \tableofcontents
@@ -82,8 +83,9 @@ available terrain and by a minimum-spacing rule.
 You must implement \textbf{one trajectory-based metaheuristic} (simulated
 annealing, tabu search, iterated local search, \dots) that calls the provided
 simulator. You are expected to design the encoding, the neighbourhood and the
-acceptance rule yourselves. \textcolor{gray}{\emph{No worked algorithm is
-supplied beyond the random-search example of Section~\ref{sec:example}.}}
+acceptance rule yourselves. \textcolor{gray}{\emph{No finished algorithm is
+supplied: the random-search example and the simulated-annealing starter kit of
+Section~\ref{sec:example} are a starting point you are expected to improve.}}
 
 %==============================================================================
 \section{The model}
@@ -222,7 +224,7 @@ set of Section~2.2, this defeats gradient-based solvers and calls for
 \label{sec:given}
 %==============================================================================
 
-Two components are provided and must not be modified:
+The following components are provided (the first two must not be modified):
 
 \begin{itemize}
   \item the \textbf{simulator} (\texttt{simulator\_wflo.py}) --- the
@@ -231,7 +233,13 @@ Two components are provided and must not be modified:
   \texttt{evaluate(layout)};
   \item the \textbf{instance generator}
   (\texttt{generate\_instances\_wflo.py}) --- builds the \texttt{toy} and
-  \texttt{hard} instances (terrain, exclusion zones, $N$, wind rose).
+  \texttt{hard} instances (terrain, exclusion zones, $N$, wind rose);
+  \item an interactive \textbf{Streamlit GUI} (\texttt{app\_wflo.py}) and the
+  \textbf{student API} (\texttt{student\_wflo.py}), which also provides a dummy
+  grid baseline to compare against;
+  \item a \textbf{simulated-annealing starter kit}
+  (\texttt{simulated\_annealing\_wflo.py}) --- a complete, runnable template
+  whose improvement points are flagged with \texttt{\# IMPROVE} comments.
 \end{itemize}
 
 \begin{center}
@@ -244,13 +252,14 @@ A layout is ``feasible'' when it satisfies (C1)--(C3); the simulator reports
 this for you, together with the objective and the efficiency.
 
 %==============================================================================
-\section{An example: random search}
+\section{Starting points: random search and simulated annealing}
 \label{sec:example}
 %==============================================================================
 
-The only algorithm supplied is the weakest possible one. Use it to learn the
-interface, then \textbf{replace it}. It samples random feasible layouts and
-keeps the best.
+Two starting points are supplied. The \emph{random search} below is the weakest
+possible algorithm --- use it to learn the interface. The
+\emph{simulated-annealing starter kit} that follows is a complete trajectory
+method that you are expected to tune and beat.
 
 \begin{lstlisting}[style=py,caption={The provided random-search example.}]
 def random_search(env, iterations, seed):
@@ -269,6 +278,19 @@ Everything you write should follow the same pattern: produce a candidate
 \texttt{layout} and score it with
 \texttt{env.evaluate(layout)["expected\_power\_mw"]}. The design of the move
 (neighbourhood) and of the acceptance rule is entirely up to you.
+
+\subsection*{Simulated-annealing starter kit}
+
+\texttt{SimulatedAnnealingWFLOSolver} implements the four ingredients of any
+trajectory method: (i) a \emph{valid random initial layout}; (ii) a
+\emph{perturbation} that moves one randomly chosen turbine by a continuous
+Gaussian step inside the terrain; (iii) a \emph{geometric cooling schedule}
+$T \leftarrow \alpha T$; and (iv) the \emph{Metropolis} acceptance rule ---
+accept improving moves, and accept a worsening move of size $\Delta<0$ with
+probability $e^{\Delta/T}$. Every improvement point is flagged with a
+\texttt{\# IMPROVE} comment: a better initial solution, a smarter neighbourhood,
+repairing infeasible candidates, an adaptive schedule, and alternative
+acceptance rules.
 
 %==============================================================================
 \section{Deliverables}

@@ -8,9 +8,11 @@ physics, objective and constraints) is in the companion document
 [`../docs/wind_farm_layout_optimization.pdf`](../docs/wind_farm_layout_optimization.pdf);
 **this README is the technical guide** for running everything.
 
-> **You are given the simulator, the generator and a GUI. Your job is to write
-> the metaheuristic.** The only algorithm provided is a deliberately weak
-> random-search example, so you can see how to call the simulator.
+> **You are given the simulator, the generator, a GUI and a simulated-annealing
+> starter kit. Your job is to write (or substantially improve) the
+> metaheuristic.** The random-search example and the SA starter kit are there so
+> you can see how to call the simulator — every part worth improving is flagged
+> with a `# IMPROVE:` comment.
 
 ---
 
@@ -34,6 +36,7 @@ wind_farm_layout_optimization/
 ├── generate_instances_wflo.py  # GIVEN — builds the 'toy' and 'hard' instances
 ├── app_wflo.py                 # GIVEN — Streamlit GUI (load, run, visualise)
 ├── student_wflo.py             # GIVEN — BaseWFLOSolver + a dummy GridSolver
+├── simulated_annealing_wflo.py # STARTER KIT — SimulatedAnnealingWFLOSolver
 ├── example_random_search.py    # GIVEN — the only algorithm (a mere example)
 ├── ingestion.py                # BACKEND — Codabench ingestion program
 ├── score.py                    # BACKEND — Codabench scoring program
@@ -49,6 +52,7 @@ wind_farm_layout_optimization/
 | `generate_instances_wflo.py` | CLI that writes `instances/toy.json` and `instances/hard.json` |
 | `app_wflo.py` | Streamlit GUI: run a solver and draw the layout + wake cones |
 | `student_wflo.py` | Solver API (`BaseWFLOSolver`) and the `GridSolver` baseline |
+| `simulated_annealing_wflo.py` | **Starter kit**: `SimulatedAnnealingWFLOSolver` to tune and beat |
 | `example_random_search.py` | Minimal random-search example (replace it!) |
 | `ingestion.py`, `score.py` | Autograder backend (strict timeout, constraints, scoring) |
 
@@ -116,8 +120,8 @@ uv run python -m wind_farm_layout_optimization.example_random_search \
     --instance wind_farm_layout_optimization/instances/toy.json --iterations 2000
 ```
 
-> There is **no baseline solver and no GUI-based algorithm** handed to you: the
-> only algorithm you are given is the random-search example.
+> The random-search example and the SA starter kit are the only algorithms
+> handed to you; everything else is yours to design and improve.
 
 ---
 
@@ -159,7 +163,45 @@ uv run python -m wind_farm_layout_optimization.student_wflo \
 
 ---
 
-## 5. Autograder (Codabench backend)
+## 5. Starter kit — Simulated Annealing
+
+`simulated_annealing_wflo.py` is a **complete, runnable** trajectory-based
+metaheuristic built on the student API. Read it, tune it, and beat it — every
+improvement point is flagged with a `# IMPROVE:` comment.
+
+It contains the four ingredients of any trajectory method:
+
+1. **Initial solution** — `initial_solution()` draws a valid random layout from
+   the simulator (a rejection sampler that respects terrain, exclusions and
+   spacing).
+2. **Perturbation** — `perturb()` picks a random turbine and moves it by a
+   continuous Gaussian step, clipped to the terrain bounding box.
+3. **Cooling schedule** — geometric: `T <- alpha * T`, with `alpha = 0.998`.
+4. **Metropolis acceptance** — keep improvements; keep a worsening move with
+   probability `exp(delta / T)`.
+
+Run it (it is also selectable in the Streamlit GUI):
+
+```bash
+uv run python -m wind_farm_layout_optimization.simulated_annealing_wflo \
+    --instance wind_farm_layout_optimization/instances/toy.json \
+    --out wind_farm_layout_optimization/solutions/toy_sa.json
+
+uv run python -m wind_farm_layout_optimization.simulated_annealing_wflo \
+    --instance wind_farm_layout_optimization/instances/hard.json \
+    --out wind_farm_layout_optimization/solutions/hard_sa.json
+```
+
+**Where to improve it** (follow the `# IMPROVE:` comments):
+
+* a **better initial solution** (greedy construction, multi-start);
+* a **better neighbourhood** (swap moves, block moves, temperature-aware step
+  size, reflecting at the boundary);
+* **repair** infeasible candidates (or add a penalty term) instead of rejecting;
+* an **adaptive schedule**, reheating or restarts;
+* other acceptance rules (threshold accepting, late acceptance, greedy).
+
+## 6. Autograder (Codabench backend)
 
 `ingestion.py` and `score.py` implement the evaluation used on Codabench.
 
@@ -189,7 +231,7 @@ On Codabench the programs are invoked positionally as
 
 ---
 
-## 6. Deliverables
+## 7. Deliverables
 
 1. A Python module implementing **one trajectory-based metaheuristic** as a
    `BaseWFLOSolver` subclass, using `WindFarmEnvironment` without modifying it.

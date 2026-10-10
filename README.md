@@ -122,6 +122,7 @@ MetaLab Suite/
 │   ├── generate_instances_wflo.py # GIVEN: builds toy + hard instances
 │   ├── app_wflo.py                # GIVEN: Streamlit GUI (run solver + wake cones)
 │   ├── student_wflo.py            # GIVEN: BaseWFLOSolver API + GridSolver
+│   ├── simulated_annealing_wflo.py# STARTER KIT: SimulatedAnnealingWFLOSolver
 │   ├── example_random_search.py   # GIVEN: the only algorithm (an example)
 │   ├── ingestion.py  score.py     # BACKEND: Codabench autograder
 │   ├── README.md                  # technical execution guide
@@ -158,6 +159,7 @@ is the deliverable:
 | `generate_instances_wflo.py` | Given: builds the `toy` and `hard` instances |
 | `app_wflo.py` | Given: Streamlit GUI (run a solver, draw wake cones) |
 | `student_wflo.py` | Given: `BaseWFLOSolver` API + `GridSolver` baseline |
+| `simulated_annealing_wflo.py` | Starter kit: SA solver with `# IMPROVE:` hooks |
 | `example_random_search.py` | Given: a deliberately weak example algorithm |
 | `ingestion.py` / `score.py` | Autograder: timeout, constraints, scoring |
 | `README.md` | Technical execution guide (referenced by the PDF) |

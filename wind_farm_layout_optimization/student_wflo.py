@@ -146,6 +146,7 @@ def run_cli(solver_cls: type[BaseWFLOSolver], argv: list[str] | None = None) -> 
         "instance": env.instance.name,
         "layout": layout,
         "objective": report["expected_power_mw"],
+        "initial_objective": getattr(solver, "initial_value", None),
         "history": solver.history,
         "runtime_s": runtime,
         "report": report,

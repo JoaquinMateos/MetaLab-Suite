@@ -16,6 +16,7 @@ from dynamic_dial_a_ride.solver import CheapestInsertionSolver
 from wind_farm_layout_optimization.example_random_search import random_search as wflo_random_search
 from wind_farm_layout_optimization.generate_instances_wflo import build as build_wflo
 from wind_farm_layout_optimization.score import compute_scores
+from wind_farm_layout_optimization.simulated_annealing_wflo import SimulatedAnnealingWFLOSolver
 from wind_farm_layout_optimization.simulator_wflo import WindFarmEnvironment
 from wind_farm_layout_optimization.starter import hill_climbing as starter_hill_climbing
 from wind_farm_layout_optimization.starter import model as starter_model
@@ -80,6 +81,17 @@ def test_grid_solver_is_feasible() -> None:
     layout = GridSolver(env, seed=0).solve()
     assert len(layout) == env.instance.n_turbines
     assert env.is_feasible(layout)
+
+
+def test_simulated_annealing_starter_kit() -> None:
+    env = WindFarmEnvironment(build_wflo("toy", seed=0))
+    solver = SimulatedAnnealingWFLOSolver(env, seed=0, iterations=300)
+    layout = solver.solve()
+    assert len(layout) == env.instance.n_turbines
+    assert env.is_feasible(layout)
+    assert solver.initial_value is not None
+    assert env.evaluate(layout)["expected_power_mw"] >= solver.initial_value - 1e-9
+    assert len(solver.history) >= 1
 
 
 def test_run_solver_script_and_scoring(tmp_path: Path) -> None:
