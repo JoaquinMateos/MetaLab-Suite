@@ -32,7 +32,7 @@ classifiers = [
 #
 # The suite is intentionally built on one virtual environment managed by uv.
 # Every problem folder (`wind_farm_layout_optimization/`,
-# `dynamic_dial_a_ride/`, ...) shares these dependencies:
+# `dynamic_drone_routing/`, ...) shares these dependencies:
 #   * mathematical evaluation ....... numpy, scipy, pandas, networkx
 #   * discrete-event simulation ..... simpy
 #   * visualization & local GUIs .... matplotlib, plotly, streamlit

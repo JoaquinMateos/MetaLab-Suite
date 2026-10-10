@@ -5,7 +5,7 @@ every problem folder in the suite: convergence-trace bookkeeping, plotting
 utilities and small numerical helpers.
 
 Each problem folder (``wind_farm_layout_optimization/``,
-``dynamic_dial_a_ride/``, ...) owns its own models, instance generator,
+``dynamic_drone_routing/``, ...) owns its own models, instance generator,
 baseline solver and Streamlit app. Only the truly common pieces live here.
 """
 

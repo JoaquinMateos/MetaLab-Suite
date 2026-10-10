@@ -10,9 +10,13 @@ from __future__ import annotations
 from pathlib import Path
 
 import wind_farm_layout_optimization
-from dynamic_dial_a_ride.generator import generate as generate_ddrp
-from dynamic_dial_a_ride.model import evaluate as evaluate_ddrp
-from dynamic_dial_a_ride.solver import CheapestInsertionSolver
+from dynamic_drone_routing.generate_instances_ddrp import assert_feasible
+from dynamic_drone_routing.generate_instances_ddrp import build as build_ddrp
+from dynamic_drone_routing.simulator_ddrp import (
+    ReoptState,
+    SimulationEnvironment,
+    greedy_planner,
+)
 from wind_farm_layout_optimization.example_random_search import random_search as wflo_random_search
 from wind_farm_layout_optimization.generate_instances_wflo import build as build_wflo
 from wind_farm_layout_optimization.score import compute_scores
@@ -25,14 +29,41 @@ from wind_farm_layout_optimization.student_wflo import GridSolver, run_solver_sc
 
 
 # ---------------------------------------------------------------------------
-# DDRP
+# DDRP (SimPy drone routing)
 # ---------------------------------------------------------------------------
-def test_ddrp_instance_and_solver() -> None:
-    instance = generate_ddrp(name="t", n_requests=12, n_vehicles=3, seed=0)
-    solution = CheapestInsertionSolver(instance).solve()
-    assert solution.diagnostics["violations"] == 0
-    assert solution.diagnostics["served"] >= 1
-    assert evaluate_ddrp(instance, solution.routes)["cost"] == solution.cost
+def test_ddrp_instances_generate_and_are_feasible() -> None:
+    for name in ("toy", "hard"):
+        instance = build_ddrp(name, seed=0)
+        assert_feasible(instance)
+        assert instance.static_orders and instance.dynamic_orders
+        assert all(o.weight <= instance.fleet.capacity + 1e-9 for o in instance.orders)
+
+
+def test_ddrp_simulation_runs_with_greedy() -> None:
+    instance = build_ddrp("toy", seed=0)
+    sim = SimulationEnvironment(instance, seed=0)
+    report = sim.run()
+    assert report["total_orders"] == len(instance.orders)
+    assert report["served"] + report["unserved"] == report["total_orders"]
+    assert report["served"] == report["total_orders"]  # greedy serves the toy instance
+    assert report["total_distance"] > 0
+    assert report["reoptimizations"] == 1 + len(instance.dynamic_orders)
+    assert any(e["event"] == "pause" for e in sim.events)
+    assert any(e["event"] == "resume" for e in sim.events)
+    assert not sim.is_paused
+
+
+def test_ddrp_custom_policy_is_invoked() -> None:
+    instance = build_ddrp("toy", seed=0)
+    calls = {"n": 0}
+
+    def policy(state: ReoptState):
+        calls["n"] += 1
+        return greedy_planner(state)
+
+    sim = SimulationEnvironment(instance, reoptimize=policy, seed=0)
+    report = sim.run()
+    assert calls["n"] == report["reoptimizations"]
 
 
 # ---------------------------------------------------------------------------

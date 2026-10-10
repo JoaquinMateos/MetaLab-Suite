@@ -54,8 +54,8 @@ Thumbs.db
 wind_farm_layout_optimization/instances/*.json
 wind_farm_layout_optimization/solutions/**
 wind_farm_layout_optimization/starter/instances/*.json
-dynamic_dial_a_ride/instances/*.json
-dynamic_dial_a_ride/solutions/**
+dynamic_drone_routing/instances/*.json
+dynamic_drone_routing/solutions/**
 !**/.gitkeep
 
 # --- Autograder / Codabench outputs --------------------------------------

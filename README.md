@@ -32,7 +32,7 @@ one lockfile, one virtual environment, many problems.
 | --- | --- | --- | --- |
 | [`wind_farm_layout_optimization/`](wind_farm_layout_optimization/README.md) | Wind Farm Layout Optimization (WFLO) — **assignment** | maximise expected power | random search (example only) |
 | ↳ [`…/starter/`](wind_farm_layout_optimization/starter/README.md) | WFLO warm-up — grid hill-climber skeleton | maximise expected power | random search |
-| [`dynamic_dial_a_ride/`](dynamic_dial_a_ride/README.md) | Dynamic Dial-a-Ride Problem (DDRP) | minimise travel + service cost | cheapest insertion |
+| [`dynamic_drone_routing/`](dynamic_drone_routing/README.md) | Dynamic Drone Routing Problem (DDRP) | minimise distance + unserved penalty | greedy insertion |
 
 > More problems are added over time. Each new folder ships with its own
 > comprehensive `README.md` (see the suite rule below).
@@ -53,10 +53,6 @@ cd docs
 pdflatex wind_farm_layout_optimization.tex && pdflatex wind_farm_layout_optimization.tex
 pdflatex dynamic_drone_routing.tex          && pdflatex dynamic_drone_routing.tex
 ```
-
-> The drone-routing theory document corresponds to problem `DDRP`; its
-> reference implementation folder is currently named `dynamic_dial_a_ride/`
-> (a rename to `dynamic_drone_routing/` is pending).
 
 ---
 
@@ -129,40 +125,28 @@ MetaLab Suite/
 │   ├── starter/                   # optional warm-up (grid + hill-climber skeleton)
 │   ├── instances/                 # generated data (git-ignored)
 │   └── solutions/                 # your solver output (git-ignored)
-└── dynamic_dial_a_ride/           # Problem #2 (self-contained)
-    ├── model.py  generator.py  solver.py  app.py  README.md
-    ├── instances/
-    └── solutions/
+└── dynamic_drone_routing/         # Problem #2 — SimPy simulation assignment
+    ├── simulator_ddrp.py          # GIVEN: SimPy engine + greedy_planner
+    ├── generate_instances_ddrp.py # GIVEN: builds toy + hard workdays
+    ├── README.md                  # technical execution guide
+    └── instances/                 # generated workdays (git-ignored)
 ```
 
 ### Anatomy of a problem folder
 
-Problems come in two flavours, but always follow a “given vs. yours” split.
-
-**Reference problems** (e.g. `dynamic_dial_a_ride/`) provide a full pipeline:
-
-| File | Purpose |
-| --- | --- |
-| `model.py` | Domain model + objective function (the "ground truth") |
-| `generator.py` | CLI that writes reproducible instances to `instances/` |
-| `solver.py` | Baseline solver + CLI, writes results to `solutions/` |
-| `app.py` | Streamlit GUI: pick instance → run → visualise |
-| `README.md` | Context, structure and the exact `uv run` commands |
-
-**Assignments** (e.g. `wind_farm_layout_optimization/`) give the student a
-*simulator* and a *generator* only, plus a trivial example — the metaheuristic
-is the deliverable:
+Both problems follow a **“given vs. yours”** split: the physics/simulation is
+given, the solver is the deliverable.
 
 | File | Purpose |
 | --- | --- |
-| `simulator_wflo.py` | Given: the objective/physics (the "ground truth") |
-| `generate_instances_wflo.py` | Given: builds the `toy` and `hard` instances |
-| `app_wflo.py` | Given: Streamlit GUI (run a solver, draw wake cones) |
-| `student_wflo.py` | Given: `BaseWFLOSolver` API + `GridSolver` baseline |
-| `simulated_annealing_wflo.py` | Starter kit: SA solver with `# IMPROVE:` hooks |
-| `example_random_search.py` | Given: a deliberately weak example algorithm |
-| `ingestion.py` / `score.py` | Autograder: timeout, constraints, scoring |
-| `README.md` | Technical execution guide (referenced by the PDF) |
+| `simulator_<problem>.py` | Given: the objective / simulation (the "ground truth") |
+| `generate_instances_<problem>.py` | Given: builds the `toy` and `hard` instances |
+| `README.md` | Technical guide (referenced by the problem's PDF) |
+| *your solver* | **The deliverable**: a placement solver (WFLO) or a dispatch policy (DDRP) |
+
+The WFLO assignment additionally ships a Streamlit GUI (`app_wflo.py`), a student
+API (`student_wflo.py`) with a `GridSolver` baseline, a simulated-annealing
+starter kit, and a Codabench autograder (`ingestion.py` / `score.py`).
 
 ---
 
