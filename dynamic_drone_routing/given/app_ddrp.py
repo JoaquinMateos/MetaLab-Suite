@@ -22,6 +22,7 @@ import os
 import subprocess
 import sys
 import tempfile
+import time
 from pathlib import Path
 
 import matplotlib
@@ -150,8 +151,8 @@ def battery_series(history: list, depot: tuple[float, float], max_range: float) 
 
 def battery_at(series: list, t: float) -> float:
     value = 1.0
-    for time, fraction in series:
-        if time <= t:
+    for when, fraction in series:
+        if when <= t:
             value = fraction
         else:
             break
@@ -385,14 +386,38 @@ else:
         )
 
     st.sidebar.header("View")
-    mode = st.sidebar.radio("Mode", ["Timeline (step-by-step)", "Bulk (final)"])
+    mode = st.sidebar.radio("Mode", ["Step-by-step", "Bulk (final)"])
+    events = data.get("events", [])
+    step_times = sorted({0.0, *[float(e["t"]) for e in events], workday})
+    n_steps = len(step_times)
+
+    play = False
     if mode == "Bulk (final)":
         t = float(report["makespan"]) if report["makespan"] else workday
         show_full = st.sidebar.checkbox("Show full paths", value=True)
     else:
-        t = st.sidebar.slider("Time (min)", 0.0, workday,
-                              min(workday, float(report["makespan"])), step=1.0)
+        st.session_state["step"] = min(int(st.session_state.get("step", 0)), n_steps - 1)
+        b1, b2, b3, b4 = st.sidebar.columns(4)
+        if b1.button("⏮", help="First step"):
+            st.session_state["step"] = 0
+            st.rerun()
+        if b2.button("◀", help="Previous step"):
+            st.session_state["step"] = max(0, st.session_state["step"] - 1)
+            st.rerun()
+        if b3.button("▶", help="Next step"):
+            st.session_state["step"] = min(n_steps - 1, st.session_state["step"] + 1)
+            st.rerun()
+        if b4.button("⏭", help="Last step"):
+            st.session_state["step"] = n_steps - 1
+            st.rerun()
+
+        step = st.sidebar.slider("Step (by event)", 0, n_steps - 1, key="step")
+        t = step_times[step]
         show_full = st.sidebar.checkbox("Also show full paths", value=False)
+        play = st.sidebar.button("▶ Play")
+        speed = st.sidebar.slider("Play speed (s/frame)", 0.05, 1.0, 0.2, 0.05)
+        here = ", ".join(e["event"] for e in events if abs(float(e["t"]) - t) < 1e-9)
+        st.sidebar.caption(f"Step {step + 1} / {n_steps} · t = {t:.0f} min · {here or 'start'}")
 
     # Status at the current time.
     deliveries = {int(k): v for k, v in report["deliveries"].items()}
@@ -405,7 +430,14 @@ else:
     d3.metric("Pending", revealed - delivered)
     d4.metric("Clock", f"{t:.0f} min")
 
-    st.pyplot(figure_run(data, t, show_full, workday=workday), clear_figure=True)
+    if play:
+        frame = st.empty()
+        for moment in step_times[step:]:
+            frame.pyplot(figure_run(data, moment, show_full, workday=workday), clear_figure=True)
+            time.sleep(float(speed))
+        st.session_state["step"] = n_steps - 1
+    else:
+        st.pyplot(figure_run(data, t, show_full, workday=workday), clear_figure=True)
 
     left, right = st.columns([3, 2])
     with left, st.expander("Event feed", expanded=True):
@@ -416,7 +448,7 @@ else:
                   "detail": ", ".join(f"{k}={v}" for k, v in e.items()
                                       if k not in ("t", "event"))}
                  for e in recent],
-                use_container_width=True, hide_index=True,
+                width="stretch", hide_index=True,
             )
         else:
             st.caption("No events yet.")
