@@ -55,6 +55,8 @@ wind_farm_layout_optimization/instances/*.json
 wind_farm_layout_optimization/solutions/**
 dynamic_drone_routing/instances/*.json
 dynamic_drone_routing/solutions/**
+multimodal_continuous_optimization/instances/*.json
+multimodal_continuous_optimization/solutions/**
 !**/.gitkeep
 
 # --- Autograder / Codabench outputs --------------------------------------

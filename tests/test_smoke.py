@@ -21,6 +21,14 @@ from dynamic_drone_routing.given.generate_instances_ddrp import assert_feasible
 from dynamic_drone_routing.given.generate_instances_ddrp import build as build_ddrp
 from dynamic_drone_routing.given.simulator_ddrp import ReoptState, SimulationEnvironment
 from dynamic_drone_routing.random_search_ddrp import RandomSearchPolicy
+from multimodal_continuous_optimization.given.generate_instances_mmco import build as build_mmco
+from multimodal_continuous_optimization.given.generate_instances_mmco import (
+    validate as validate_mmco,
+)
+from multimodal_continuous_optimization.given.simulator_mmco import (
+    EvaluationBudgetExceeded,
+    SignalEnvironment,
+)
 from wind_farm_layout_optimization import student_wflo
 from wind_farm_layout_optimization.autograder.score import compute_scores
 from wind_farm_layout_optimization.given.generate_instances_wflo import build as build_wflo
@@ -189,3 +197,50 @@ def test_ddrp_scoring_formula() -> None:
     battery = {"instances": {"a": {"valid": True, "distance": 10.0, "unserved": 0,
                                    "swaps": 0, "battery_violations": 1}}}
     assert compute_ddrp_scores(battery)[1]["a"] >= 1e9
+
+
+# ===========================================================================
+# MMCO (multimodal continuous optimization)
+# ===========================================================================
+def test_mmco_instances_generate_and_are_well_posed() -> None:
+    for name in ("toy", "hard"):
+        instance = build_mmco(name, seed=0)
+        validate_mmco(instance)  # raises if ill-posed
+        assert instance.dimension >= 1
+        assert instance.max_evaluations > 0
+        assert len(instance.optimum) == instance.dimension
+
+
+def test_mmco_optimum_is_reachable() -> None:
+    for name in ("toy", "hard"):
+        instance = build_mmco(name, seed=0)
+        env = SignalEnvironment(instance)
+        value = env.evaluate(instance.optimum)
+        assert abs(value - env.optimum_value) < 1e-9
+        assert env.report()["hit"]
+
+
+def test_mmco_budget_is_cut_strictly() -> None:
+    instance = build_mmco("toy", seed=0)
+    env = SignalEnvironment(instance)
+    for _ in range(instance.max_evaluations):
+        env.evaluate(env.random_solution())
+    assert env.remaining == 0
+    try:
+        env.evaluate(env.random_solution())
+    except EvaluationBudgetExceeded:
+        pass
+    else:  # pragma: no cover
+        raise AssertionError("strict mode should raise past the budget")
+    report = env.report()
+    assert report["budget_exceeded"] and not report["valid"]
+    assert report["over_budget_calls"] == 1
+
+
+def test_mmco_budget_penalty_mode() -> None:
+    instance = build_mmco("toy", seed=0)
+    env = SignalEnvironment(instance, strict_budget=False, penalty=999.0)
+    for _ in range(instance.max_evaluations):
+        env.evaluate(env.random_solution())
+    assert env.evaluate(env.random_solution()) == 999.0
+    assert not env.report()["valid"]

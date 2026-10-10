@@ -32,6 +32,7 @@ one lockfile, one virtual environment, many problems.
 | --- | --- | --- | --- |
 | [`wind_farm_layout_optimization/`](wind_farm_layout_optimization/README.md) | Wind Farm Layout Optimization (WFLO) — **assignment** | maximise expected power | random search (example only) |
 | [`dynamic_drone_routing/`](dynamic_drone_routing/README.md) | Dynamic Drone Routing Problem (DDRP) — **assignment** | minimise distance + unserved penalty | random search (example only) |
+| [`multimodal_continuous_optimization/`](multimodal_continuous_optimization/README.md) | Multimodal Continuous Optimization (MMCO) — **assignment** | find the global optimum within an evaluation budget | random sampling (example only) |
 
 > More problems are added over time. Each new folder ships with its own
 > comprehensive `README.md` (see the suite rule below).
@@ -122,15 +123,21 @@ MetaLab Suite/
 │   │   ├── generate_instances_wflo.py
 │   │   └── app_wflo.py            #   Streamlit GUI
 │   └── autograder/                # Codabench ingestion.py + score.py
-└── dynamic_drone_routing/         # Problem #2 — SimPy simulation assignment
-    ├── student_ddrp.py            # YOUR FILE: OOP skeleton (BaseSolver + MySolver)
-    ├── random_search_ddrp.py      # the ONLY algorithm given (random search)
+├── dynamic_drone_routing/         # Problem #2 — SimPy simulation assignment
+│   ├── student_ddrp.py            # YOUR FILE: OOP skeleton (BaseSolver + MySolver)
+│   ├── random_search_ddrp.py      # the ONLY algorithm given (random search)
+│   ├── instances/  solutions/     # data / your outputs (git-ignored)
+│   ├── given/                     # provided — do not edit
+│   │   ├── simulator_ddrp.py      #   SimPy engine
+│   │   ├── generate_instances_ddrp.py
+│   │   └── app_ddrp.py            #   Streamlit visualiser
+│   └── autograder/                # Codabench ingestion.py + score.py
+└── multimodal_continuous_optimization/   # Problem #3 — budget-constrained optimization
+    ├── README.md                  # technical guide
     ├── instances/  solutions/     # data / your outputs (git-ignored)
-    ├── given/                     # provided — do not edit
-    │   ├── simulator_ddrp.py      #   SimPy engine
-    │   ├── generate_instances_ddrp.py
-    │   └── app_ddrp.py            #   Streamlit visualiser
-    └── autograder/                # Codabench ingestion.py + score.py
+    └── given/                     # provided — do not edit
+        ├── simulator_mmco.py      #   environment engine (evaluation budget)
+        └── generate_instances_mmco.py
 ```
 
 ### Anatomy of a problem folder
