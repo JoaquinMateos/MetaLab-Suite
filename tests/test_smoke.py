@@ -7,6 +7,7 @@ scoring behaves. They catch obvious breakage, not subtle algorithmic errors.
 
 from __future__ import annotations
 
+import json
 from pathlib import Path
 
 import wind_farm_layout_optimization
@@ -21,6 +22,7 @@ from dynamic_drone_routing.given.generate_instances_ddrp import assert_feasible
 from dynamic_drone_routing.given.generate_instances_ddrp import build as build_ddrp
 from dynamic_drone_routing.given.simulator_ddrp import ReoptState, SimulationEnvironment
 from dynamic_drone_routing.random_search_ddrp import RandomSearchPolicy
+from multimodal_continuous_optimization import run_local
 from multimodal_continuous_optimization.given.generate_instances_mmco import build as build_mmco
 from multimodal_continuous_optimization.given.generate_instances_mmco import (
     validate as validate_mmco,
@@ -29,6 +31,8 @@ from multimodal_continuous_optimization.given.simulator_mmco import (
     EvaluationBudgetExceeded,
     SignalEnvironment,
 )
+from multimodal_continuous_optimization.hill_climbing_mmco import HillClimbingSolver
+from multimodal_continuous_optimization.student_mmco import BudgetExhausted, MySolver
 from wind_farm_layout_optimization import student_wflo
 from wind_farm_layout_optimization.autograder.score import compute_scores
 from wind_farm_layout_optimization.given.generate_instances_wflo import build as build_wflo
@@ -244,3 +248,68 @@ def test_mmco_budget_penalty_mode() -> None:
         env.evaluate(env.random_solution())
     assert env.evaluate(env.random_solution()) == 999.0
     assert not env.report()["valid"]
+
+
+def _hill_climb(instance):
+    env = SignalEnvironment(instance)
+    solver = HillClimbingSolver(
+        env.evaluate, instance.dimension, instance.lower, instance.upper,
+        instance.max_evaluations, seed=0,
+    )
+    best = solver.solve()
+    return env, solver, best
+
+
+def test_mmco_hill_climbing_respects_budget_and_bounds() -> None:
+    instance = build_mmco("toy", seed=0)
+    env, solver, best = _hill_climb(instance)
+    assert solver.queries == instance.max_evaluations
+    assert len(best) == instance.dimension
+    assert all(instance.lower <= v <= instance.upper for v in best)
+    assert solver.best_value >= env.optimum_value - 1e-9
+    values = [value for _, value in solver.history]
+    assert values == sorted(values, reverse=True)  # best-so-far is monotone
+
+
+def test_mmco_hill_climbing_gets_stuck() -> None:
+    instance = build_mmco("toy", seed=0)
+    env, _solver, _best = _hill_climb(instance)
+    # the baseline stalls in a false positive, well above the tolerance
+    assert env.report()["gap"] > instance.tolerance
+
+
+def test_mmco_skeleton_and_query_guards() -> None:
+    instance = build_mmco("toy", seed=0)
+    env = SignalEnvironment(instance)
+    try:
+        MySolver(env.evaluate, instance.dimension, instance.lower, instance.upper,
+                 instance.max_evaluations, seed=0).solve()
+    except NotImplementedError:
+        pass
+    else:  # pragma: no cover
+        raise AssertionError("the MMCO skeleton should raise NotImplementedError")
+
+    env2 = SignalEnvironment(instance)
+    solver = HillClimbingSolver(env2.evaluate, instance.dimension, instance.lower,
+                                instance.upper, instance.max_evaluations, seed=0)
+    solver.solve()
+    try:
+        solver.query(solver.best_x)
+    except BudgetExhausted:
+        pass
+    else:  # pragma: no cover
+        raise AssertionError("query past the budget should raise BudgetExhausted")
+
+
+def test_mmco_run_local(tmp_path: Path) -> None:
+    inst_path = tmp_path / "toy.json"
+    build_mmco("toy", seed=0).save(inst_path)
+    out = tmp_path / "run.json"
+    report = run_local.main([
+        "--instance", str(inst_path), "--solver", "hill_climbing",
+        "--seed", "0", "--out", str(out),
+    ])
+    assert report["evaluations"] == report["budget"]
+    data = json.loads(out.read_text(encoding="utf-8"))
+    assert data["solver"] == "hill_climbing"
+    assert data["report"]["evaluations"] == report["budget"]
