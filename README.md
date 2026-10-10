@@ -128,8 +128,12 @@ MetaLab Suite/
 └── dynamic_drone_routing/         # Problem #2 — SimPy simulation assignment
     ├── simulator_ddrp.py          # GIVEN: SimPy engine + greedy_planner
     ├── generate_instances_ddrp.py # GIVEN: builds toy + hard workdays
+    ├── app_ddrp.py                # GIVEN: Streamlit visualiser (timeline)
+    ├── student_ddrp.py            # GIVEN: BaseSolver + GreedySolver
+    ├── ingestion.py  score.py     # BACKEND: Codabench autograder
     ├── README.md                  # technical execution guide
-    └── instances/                 # generated workdays (git-ignored)
+    ├── instances/                 # generated workdays (git-ignored)
+    └── solutions/                 # solver outputs (git-ignored)
 ```
 
 ### Anatomy of a problem folder
@@ -146,7 +150,9 @@ given, the solver is the deliverable.
 
 The WFLO assignment additionally ships a Streamlit GUI (`app_wflo.py`), a student
 API (`student_wflo.py`) with a `GridSolver` baseline, a simulated-annealing
-starter kit, and a Codabench autograder (`ingestion.py` / `score.py`).
+starter kit, and a Codabench autograder (`ingestion.py` / `score.py`). DDRP
+ships its own Streamlit visualiser (`app_ddrp.py`), a student API
+(`student_ddrp.py`) with a `GreedySolver` baseline, and a Codabench autograder.
 
 ---
 

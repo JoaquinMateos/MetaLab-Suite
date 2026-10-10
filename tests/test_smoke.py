@@ -12,11 +12,14 @@ from pathlib import Path
 import wind_farm_layout_optimization
 from dynamic_drone_routing.generate_instances_ddrp import assert_feasible
 from dynamic_drone_routing.generate_instances_ddrp import build as build_ddrp
+from dynamic_drone_routing.ingestion import EventTimeout, make_timed_policy, run_instance
+from dynamic_drone_routing.score import compute_scores as compute_ddrp_scores
 from dynamic_drone_routing.simulator_ddrp import (
     ReoptState,
     SimulationEnvironment,
     greedy_planner,
 )
+from dynamic_drone_routing.student_ddrp import GreedySolver
 from wind_farm_layout_optimization.example_random_search import random_search as wflo_random_search
 from wind_farm_layout_optimization.generate_instances_wflo import build as build_wflo
 from wind_farm_layout_optimization.score import compute_scores
@@ -46,7 +49,7 @@ def test_ddrp_simulation_runs_with_greedy() -> None:
     assert report["total_orders"] == len(instance.orders)
     assert report["served"] + report["unserved"] == report["total_orders"]
     assert report["served"] == report["total_orders"]  # greedy serves the toy instance
-    assert report["total_distance"] > 0
+    assert report["distance"] > 0
     assert report["reoptimizations"] == 1 + len(instance.dynamic_orders)
     assert any(e["event"] == "pause" for e in sim.events)
     assert any(e["event"] == "resume" for e in sim.events)
@@ -64,6 +67,54 @@ def test_ddrp_custom_policy_is_invoked() -> None:
     sim = SimulationEnvironment(instance, reoptimize=policy, seed=0)
     report = sim.run()
     assert calls["n"] == report["reoptimizations"]
+
+
+def test_ddrp_greedy_solver_and_export() -> None:
+    instance = build_ddrp("toy", seed=0)
+    solver = GreedySolver(instance, seed=0)
+    sim = SimulationEnvironment(instance, reoptimize=solver.reoptimize, seed=0)
+    report = sim.run()
+    assert report["valid"]
+    assert report["served"] == report["total_orders"]
+    export = sim.export()
+    assert set(export["trajectories"]) == {str(i) for i in range(instance.fleet.n_drones)}
+    assert all(len(history) >= 2 for history in export["trajectories"].values())
+
+
+def test_ddrp_ingestion_run_instance_is_valid() -> None:
+    instance = build_ddrp("toy", seed=0)
+    policy = GreedySolver(instance, seed=0).reoptimize
+    result = run_instance(instance, policy, per_event_cpu=2.0, total_wall=30.0, seed=0)
+    assert result["valid"]
+    assert result["served"] == len(instance.orders)
+
+
+def test_ddrp_per_event_cpu_timeout() -> None:
+    def slow_policy(_state):  # burns CPU forever
+        while True:
+            pass
+
+    timed = make_timed_policy(slow_policy, per_event_cpu=0.05)
+    try:
+        timed(None)
+    except EventTimeout:
+        pass
+    else:  # pragma: no cover
+        raise AssertionError("expected the per-event CPU timeout to fire")
+
+
+def test_ddrp_scoring_formula() -> None:
+    valid = {"instances": {"a": {"valid": True, "distance": 100.0, "unserved": 1, "swaps": 2}}}
+    total, per_instance = compute_ddrp_scores(valid)
+    assert per_instance["a"] == 100.0 + 1000.0 * 1 + 10.0 * 2
+    assert total == per_instance["a"]
+
+    invalid = {"instances": {"a": {"valid": False, "distance": 0.0, "unserved": 0, "swaps": 0}}}
+    assert compute_ddrp_scores(invalid)[1]["a"] >= 1e9
+
+    battery = {"instances": {"a": {"valid": True, "distance": 10.0, "unserved": 0,
+                                   "swaps": 0, "battery_violations": 1}}}
+    assert compute_ddrp_scores(battery)[1]["a"] >= 1e9
 
 
 # ---------------------------------------------------------------------------

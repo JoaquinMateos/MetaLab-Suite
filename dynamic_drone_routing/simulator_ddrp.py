@@ -145,6 +145,9 @@ class Drone:
         self.id = drone_id
         self.spec = sim.instance.fleet
         self.position: tuple[float, float] = sim.instance.depot
+        self.history: list[tuple[float, float, float]] = [
+            (env.now, self.position[0], self.position[1])
+        ]  # (time, x, y) waypoints for the visualiser
         self.payload = 0.0
         self.battery = self.spec.max_range
         self.routes: list[list[int]] = []  # queue of assigned routes
@@ -180,6 +183,7 @@ class Drone:
             yield from self._travel(order.position)
             self.payload -= order.weight
             yield self.env.timeout(self.spec.service_time)  # hover / drop
+            self.history.append((self.env.now, self.position[0], self.position[1]))
             self.sim._deliver(order)
         yield from self._travel(self.sim.instance.depot)
         self.battery = self.spec.max_range  # instant battery swap
@@ -191,8 +195,13 @@ class Drone:
         leg = math.dist(self.position, target)
         yield self.env.timeout(leg / self.spec.speed)
         self.sim.total_distance += leg
-        self.battery -= leg
+        if leg > self.battery + 1e-9:  # the drone does not have enough charge
+            self.sim.battery_violations.append(
+                {"t": self.env.now, "drone": self.id, "needed": leg, "available": self.battery}
+            )
+        self.battery = max(0.0, self.battery - leg)
         self.position = target
+        self.history.append((self.env.now, target[0], target[1]))
 
 
 # =============================================================================
@@ -266,6 +275,9 @@ class SimulationEnvironment:
         self.reoptimizations = 0
         self.is_paused = False
         self.events: list[dict] = []
+        self.battery_violations: list[dict] = []
+        self.payload_violations: list[dict] = []
+        self.range_violations: list[dict] = []
 
         self._dynamic = sorted(
             instance.dynamic_orders, key=lambda order: order.release_time
@@ -289,6 +301,31 @@ class SimulationEnvironment:
         self.delivered[order.id] = self.env.now
         self.planned.discard(order.id)
         self._log("delivery", order=order.id)
+
+    def _validate_route(self, drone: Drone, route: list[int]) -> None:
+        """Record payload / range violations before a route is flown.
+
+        These never stop the simulation (so the run always finishes and can be
+        scored), but they mark the plan as physically invalid.
+        """
+        load = sum(self.orders_by_id[order_id].weight for order_id in route)
+        if load > drone.spec.capacity + 1e-9:
+            self.payload_violations.append(
+                {"t": self.env.now, "drone": drone.id, "load": load,
+                 "capacity": drone.spec.capacity}
+            )
+        distance = 0.0
+        position = self.instance.depot
+        for order_id in route:
+            target = self.orders_by_id[order_id].position
+            distance += math.dist(position, target)
+            position = target
+        distance += math.dist(position, self.instance.depot)
+        if distance > drone.spec.max_range + 1e-9:
+            self.range_violations.append(
+                {"t": self.env.now, "drone": drone.id, "distance": distance,
+                 "max_range": drone.spec.max_range}
+            )
 
     # -- the re-optimisation hook ------------------------------------------
     def reoptimize(self) -> None:
@@ -317,6 +354,7 @@ class SimulationEnvironment:
                 and order_id not in self.delivered
             ]
             if feasible:
+                self._validate_route(self.drones[drone_id], feasible)
                 self.drones[drone_id].assign(feasible)
                 self.planned.update(feasible)
                 self._log("dispatch", drone=drone_id, route=feasible)
@@ -351,17 +389,34 @@ class SimulationEnvironment:
         total = len(self.orders_by_id)
         unserved = total - served
         makespan = max(self.delivered.values()) if self.delivered else 0.0
+        valid = not (self.battery_violations or self.payload_violations or self.range_violations)
         return {
             "instance": self.instance.name,
             "served": served,
             "unserved": unserved,
             "total_orders": total,
-            "total_distance": self.total_distance,
-            "battery_swaps": self.battery_swaps,
+            "distance": self.total_distance,
+            "swaps": self.battery_swaps,
             "reoptimizations": self.reoptimizations,
             "makespan": makespan,
             "objective": self.total_distance + UNSERVED_PENALTY * unserved,
+            "valid": valid,
+            "battery_violations": len(self.battery_violations),
+            "payload_violations": len(self.payload_violations),
+            "range_violations": len(self.range_violations),
             "deliveries": dict(sorted(self.delivered.items())),
+        }
+
+    def export(self) -> dict:
+        """A full description of the run, for the visualiser and the autograder."""
+        return {
+            "instance": self.instance.name,
+            "depot": list(self.instance.depot),
+            "fleet": asdict(self.instance.fleet),
+            "orders": [asdict(order) for order in self.instance.orders],
+            "report": self.report(),
+            "trajectories": {str(d.id): [list(p) for p in d.history] for d in self.drones},
+            "events": self.events,
         }
 
 
@@ -384,10 +439,13 @@ def main(argv: list[str] | None = None) -> dict:
     print(f"Instance        : {instance.name} ({result['total_orders']} orders, "
           f"{instance.fleet.n_drones} drones)")
     print(f"Served          : {result['served']} / {result['total_orders']}")
-    print(f"Total distance  : {result['total_distance']:.1f}")
-    print(f"Battery swaps   : {result['battery_swaps']}")
+    print(f"Total distance  : {result['distance']:.1f}")
+    print(f"Battery swaps   : {result['swaps']}")
     print(f"Re-optimisations: {result['reoptimizations']}")
     print(f"Makespan        : {result['makespan']:.1f} min")
+    print(f"Valid           : {result['valid']} "
+          f"(battery/payload/range violations: {result['battery_violations']}/"
+          f"{result['payload_violations']}/{result['range_violations']})")
     print(f"Objective       : {result['objective']:.1f} (distance + penalty x unserved)")
     return result
 
