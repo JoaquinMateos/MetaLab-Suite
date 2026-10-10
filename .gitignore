@@ -38,6 +38,17 @@ coverage.xml
 .DS_Store
 Thumbs.db
 
+# --- LaTeX ----------------------------------------------------------------
+*.aux
+*.log
+*.out
+*.toc
+*.fls
+*.fdb_latexmk
+*.synctex.gz
+*.bbl
+*.blg
+
 # --- Project artifacts ----------------------------------------------------
 # Generated problem data. Keep the folders, ignore their contents.
 wind_farm_layout_optimization/instances/*.json

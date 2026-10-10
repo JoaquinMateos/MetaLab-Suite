@@ -1,0 +1,815 @@
+%==============================================================================
+%  MetaLab Suite --- Theoretical Framework
+%  Trajectory-Based Metaheuristics for Wind Farm Layout Optimization (WFLO)
+%  and the Dynamic Drone Routing Problem (DDRP)
+%
+%  Compile with:  pdflatex theoretical_framework.tex   (run twice for the ToC)
+%==============================================================================
+\documentclass[11pt,a4paper]{article}
+
+\usepackage[T1]{fontenc}
+\usepackage[utf8]{inputenc}
+\usepackage{lmodern}
+\usepackage[margin=2.5cm]{geometry}
+\usepackage{amsmath,amssymb,amsthm,mathtools}
+\usepackage{booktabs}
+\usepackage{array}
+\usepackage{algorithm}
+\usepackage{algpseudocode}
+\usepackage{xcolor}
+\usepackage{caption}
+\usepackage{microtype}
+\usepackage[hidelinks]{hyperref}
+
+%------------------------------------------------------------------------------
+%  Mathematical shortcuts and theorem-like environments
+%------------------------------------------------------------------------------
+\newtheorem{definition}{Definition}
+\newtheorem{proposition}{Proposition}
+\newtheorem{remark}{Remark}
+
+\DeclareMathOperator*{\argmax}{arg\,max}
+\DeclareMathOperator*{\argmin}{arg\,min}
+\newcommand{\R}{\mathbb{R}}
+\newcommand{\E}{\mathbb{E}}
+\newcommand{\Prob}{\mathbb{P}}
+\newcommand{\norm}[1]{\left\lVert #1 \right\rVert}
+\newcommand{\abs}[1]{\left\lvert #1 \right\rvert}
+
+\title{%
+  \textbf{Theoretical Framework for Trajectory-Based Metaheuristics}\\[3mm]
+  \large Wind Farm Layout Optimization and the Dynamic Drone Routing Problem}
+\author{%
+  MetaLab Suite\\[1mm]
+  \small Department of Operations Research}
+\date{\today}
+
+%==============================================================================
+\begin{document}
+\maketitle
+
+\begin{abstract}
+\noindent
+This document establishes the theoretical foundations of the MetaLab Suite, an
+educational repository devoted to \emph{trajectory-based metaheuristics} for
+combinatorial and continuous optimisation. We develop, in full mathematical
+detail, two flagship problems. \textbf{Part~I} addresses the
+\emph{Wind Farm Layout Optimization} (WFLO) problem: given a terrain and a wind
+resource, where should turbines be placed so as to maximise the expected power
+output while mitigating the aerodynamic \emph{wake effect}? We derive the
+objective function $P_{\text{total}}$, state the topographical and engineering
+constraints, and present a simplified \emph{Jensen} wake model, before arguing
+why the resulting landscape is strongly multimodal and therefore calls for
+trajectory-based search. \textbf{Part~II} addresses the \emph{Dynamic Drone
+Routing Problem} (DDRP) in the spirit of Dorling et al.~(2016): a fleet of
+unmanned aerial vehicles serves delivery orders that are revealed in real time,
+subject to a strict payload capacity $Q$ and a battery budget whose consumption
+scales with both payload and travelled distance. We formulate the objective
+(minimise distance plus unserved-order penalties) and the associated
+constraints, extend the model to the dynamic setting, and close with the design
+of trajectory metaheuristics for both problems.
+\end{abstract}
+
+\tableofcontents
+\bigskip
+
+%==============================================================================
+\section{Introduction}
+%==============================================================================
+
+\subsection{Scope and motivation}
+
+Many real-world planning problems are \emph{black-box}, \emph{constrained} and
+\emph{multimodal}: the objective cannot be differentiated analytically, feasible
+regions are riddled with holes, and the landscape contains a combinatorial
+profusion of local optima. Two representative examples motivate this document:
+the siting of wind turbines on a complex terrain (Part~I) and the routing of
+delivery drones under real-time demand (Part~II).
+
+Trajectory-based metaheuristics---also called \emph{single-solution} or
+\emph{local-search} metaheuristics---are particularly well suited to such
+problems. Rather than maintaining a population, they evolve a single incumbent
+solution $x^{0}, x^{1}, \dots, x^{T}$ by iteratively exploring a
+\emph{neighbourhood} $\mathcal{N}(x)$ and applying an acceptance rule that may
+temporarily worsen the objective so as to escape local optima.
+
+\subsection{Trajectory-based metaheuristics: common skeleton}
+
+Formally, given a finite or continuous \emph{search space} $\mathcal{X}$, an
+objective $f:\mathcal{X}\to\R$ (to be minimised or maximised), and a
+neighbourhood operator $\mathcal{N}:\mathcal{X}\to 2^{\mathcal{X}}$, a generic
+trajectory method proceeds as in Algorithm~\ref{alg:generic}.
+
+\begin{algorithm}[H]
+\caption{Generic trajectory-based metaheuristic}
+\label{alg:generic}
+\begin{algorithmic}[1]
+\State Initialise $x \leftarrow x^{0} \in \mathcal{X}$ (e.g.\ at random or greedily)
+\State $x^{\star} \leftarrow x$ \Comment{best solution found so far}
+\While{stopping criterion not met}
+    \State Generate a candidate $x' \in \mathcal{N}(x)$
+    \If{$\textsc{Accept}(x, x', \text{state})$}
+        \State $x \leftarrow x'$
+    \EndIf
+    \If{$f(x')$ improves $f(x^{\star})$}
+        \State $x^{\star} \leftarrow x'$
+    \EndIf
+    \State Update the search \emph{state} (temperature, tabu tenure, \dots)
+\EndWhile
+\State \Return $x^{\star}$
+\end{algorithmic}
+\end{algorithm}
+
+Three instantiations are used throughout the suite and differ only in the
+acceptance rule:
+\begin{itemize}
+  \item \textbf{Simulated annealing (SA)} accepts a worsening move with
+        probability $\exp(-\Delta / T)$, where $\Delta>0$ is the objective
+        degradation and $T$ a slowly decreasing temperature
+        \cite{kirkpatrick1983}.
+  \item \textbf{Tabu search (TS)} always moves to the best admissible neighbour
+        but forbids recently visited configurations through a short-term memory
+        (the \emph{tabu list}), with an aspiration criterion to override the
+        tabu status on sufficiently good moves \cite{glover1989}.
+  \item \textbf{Iterated local search (ILS)} alternates a local-search descent
+        with a stochastic \emph{perturbation} of the incumbent, accepting the
+        result by a simple criterion \cite{lourenco2003}.
+\end{itemize}
+
+A crucial property for Part~II is that trajectory methods are
+\emph{anytime}: they may be interrupted at any moment and still return the best
+solution found so far, which is exactly what a real-time dispatcher needs.
+
+\subsection{Notation}
+
+\begin{table}[H]
+\centering
+\caption{Global notation used in both parts.}
+\label{tab:notation}
+\begin{tabular}{@{}ll@{}}
+\toprule
+Symbol & Meaning \\
+\midrule
+$\mathcal{X}$            & search space (problem-dependent encoding) \\
+$f(\cdot)$               & objective function of the metaheuristic \\
+$\mathcal{N}(x)$         & neighbourhood of solution $x$ \\
+$x^{\star}$              & best solution found during a run \\
+$T$                      & temperature (SA) \\
+$\mathcal{T}$            & tabu list (TS) \\
+$N$                      & number of turbines (Part~I) \\
+$Q$                      & payload capacity of a drone (Part~II) \\
+$B$                      & battery energy budget of a drone (Part~II) \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+%==============================================================================
+\section{Part I --- Wind Farm Layout Optimization (WFLO)}
+%==============================================================================
+
+\subsection{Problem description}
+
+A wind farm occupies a domain $\Omega \subset \R^{2}$ (the available land,
+possibly irregular and with an elevation profile). We must choose the positions
+\[
+  X = \bigl(x_{1}, x_{2}, \dots, x_{N}\bigr), \qquad
+  x_{j} = \bigl(x_{j}^{(1)}, x_{j}^{(2)}\bigr) \in \Omega,
+\]
+of $N$ identical turbines so that the farm's electrical production is as large
+as possible over a reference year. The fundamental difficulty is the
+\emph{wake effect}: an upwind turbine extracts kinetic energy from the flow and
+leaves behind it a region of reduced wind speed and increased turbulence. A
+turbine standing in that wake therefore produces less than it would in
+free-stream conditions. Pushing turbines apart reduces wake losses but consumes
+land and increases collector-system and civil costs; clustering them together
+saves land but intensifies interference. The optimal design must balance these
+two effects, which is what makes the problem non-trivial.
+
+\subsection{The wake effect}
+
+Let the wind travel in direction $\theta$ (the bearing it blows towards), with
+unit vector $\mathrm{n}=(\cos\theta,\sin\theta)$ and its normal
+$\mathrm{n}^{\perp}=(-\sin\theta,\cos\theta)$. For two turbines $i$ and $j$,
+define the \emph{along-wind} and \emph{cross-wind} separations
+\begin{equation}
+  x_{ij} = (x_{j}-x_{i})\cdot\mathrm{n},
+  \qquad
+  y_{ij} = \bigl\lvert (x_{j}-x_{i})\cdot\mathrm{n}^{\perp} \bigr\rvert .
+  \label{eq:separations}
+\end{equation}
+A deficit is created behind turbine $i$ only if $x_{ij}>0$ (turbine $j$ is
+downwind of $i$) and if $j$ lies inside the expanding wake.
+
+\subsection{Simplified Jensen wake model}
+
+The Jensen (or Kati\'c--Jensen) model \cite{jensen1983,katic1986} assumes a
+\emph{top-hat} velocity profile: inside the wake the wind speed is uniform, and
+the wake expands linearly with downstream distance at a rate governed by the
+decay constant $k$. Its radius at downstream distance $x$ from a rotor of
+diameter $D$ is
+\begin{equation}
+  R_{w}(x) = \frac{D}{2} + k\,x .
+  \label{eq:jensen-radius}
+\end{equation}
+When turbine $j$ is partially or fully immersed in the wake of $i$, the
+fractional velocity deficit is
+\begin{equation}
+  \delta_{ij}
+  = \left( 1-\sqrt{1-C_{T}} \right)
+    \left( \frac{D}{D + 2k\,x_{ij}} \right)^{2},
+  \qquad
+  \delta_{ij}=0 \ \text{if } x_{ij}\le 0 \ \text{or } y_{ij} > R_{w}(x_{ij}),
+  \label{eq:jensen-deficit}
+\end{equation}
+where $C_{T}\in(0,1)$ is the thrust coefficient of the turbine. The factor
+$1-\sqrt{1-C_{T}}$ equals twice the axial induction factor $a$, so
+Eq.~\eqref{eq:jensen-deficit} has a clear physical interpretation: the maximum
+deficit immediately behind the rotor is $2a$, and it decays as the wake spreads.
+
+For a given wind scenario the total deficit at turbine $j$ is obtained by
+superposing the contributions of all upwind turbines, most commonly in
+\emph{root-sum-square} form,
+\begin{equation}
+  U_{j} = U_{\infty}\left( 1-\sqrt{\sum_{i \in \mathcal{I}_{j}} \delta_{ij}^{2}} \right)_{+},
+  \qquad
+  \mathcal{I}_{j} = \bigl\{\, i : x_{ij}>0 \ \wedge\ y_{ij} \le R_{w}(x_{ij}) \,\bigr\},
+  \label{eq:effective-speed}
+\end{equation}
+with $U_{\infty}$ the free-stream speed and $(\cdot)_{+}=\max(\cdot,0)$ to keep
+the effective speed non-negative. Linear superposition
+$U_{j}=U_{\infty}(1-\sum_{i}\delta_{ij})$ is a common alternative; both are
+supported by the reference implementation. The Jensen model is deliberately
+simple. It neglects turbulence anisotropy, ground effects and yaw, yet it
+reproduces the qualitative behaviour that dominates the optimisation and keeps
+the objective cheap enough for the tens of thousands of evaluations a
+metaheuristic requires.
+
+\subsection{Turbine power curve}
+
+The electrical power produced by a single turbine as a function of wind speed
+$u$ is modelled by the standard piecewise \emph{power curve}. With cut-in speed
+$u_{\text{in}}$, rated speed $u_{r}$, cut-out speed $u_{\text{out}}$ and rated
+power $P_{r}$,
+\begin{equation}
+  P(u) =
+  \begin{cases}
+    0, & u < u_{\text{in}} \ \text{or} \ u \ge u_{\text{out}},\\[1mm]
+    P_{r}\left(\dfrac{u-u_{\text{in}}}{u_{r}-u_{\text{in}}}\right)^{3},
+      & u_{\text{in}} \le u < u_{r},\\[2mm]
+    P_{r}, & u_{r} \le u < u_{\text{out}}.
+  \end{cases}
+  \label{eq:power-curve}
+\end{equation}
+The cubic regime reflects the fact that the kinetic power of the wind scales
+with the cube of its speed, $P_{\text{wind}}=\tfrac12\rho A u^{3}$, where
+$\rho$ is air density and $A$ the rotor swept area.
+
+\subsection{Wind resource: the discretised wind rose}
+
+The wind climate is summarised by a \emph{wind rose}: a finite set of $S$
+scenarios $\{(\theta_{s}, U_{s}^{\infty}, p_{s})\}_{s=1}^{S}$, where
+$\theta_{s}$ is a direction, $U_{s}^{\infty}$ a representative speed and
+$p_{s}\in[0,1]$ its relative frequency, with $\sum_{s=1}^{S}p_{s}=1$. The rose is
+typically obtained by binning historical anemometry data in direction and speed.
+
+\subsection{Objective function: expected power \texorpdfstring{$P_{\text{total}}$}{P\_total}}
+
+For scenario $s$, applying \eqref{eq:effective-speed} and \eqref{eq:power-curve}
+to every turbine gives the farm's instantaneous power
+\begin{equation}
+  P_{\text{total}}^{(s)}(X)
+  = \sum_{j=1}^{N} P\bigl(U_{j}^{(s)}(X)\bigr),
+  \label{eq:power-scenario}
+\end{equation}
+and the \emph{expected} power output of the layout is the probability-weighted
+average over the rose,
+\begin{equation}
+  \boxed{\;
+  \bar{P}(X)
+  = \sum_{s=1}^{S} p_{s}\, P_{\text{total}}^{(s)}(X)
+  = \sum_{s=1}^{S} p_{s} \sum_{j=1}^{N}
+      P\!\left( U_{\infty,s}
+      \Bigl(1-\sqrt{\textstyle\sum_{i\in\mathcal{I}_{j}} \delta_{ij}^{2}}\Bigr)_{+} \right).
+  \;}
+  \label{eq:objective-wflo}
+\end{equation}
+Multiplying by the number of hours in a year, $T_{\text{year}}=8760\ \text{h}$,
+yields the \emph{Annual Energy Production} $\text{AEP}(X)=T_{\text{year}}\,
+\bar{P}(X)$. Because turbines may be assigned a hub height $H_{j}=h(x_{j})+H_{0}$
+that follows the terrain elevation $h$, the effective speeds in
+\eqref{eq:objective-wflo} can be evaluated at the local hub height, although we
+keep the notation compact here. The WFLO problem is then
+\begin{equation}
+  \text{(WFLO)} \qquad
+  \max_{X \in \mathcal{F}} \ \bar{P}(X),
+  \label{eq:wflo}
+\end{equation}
+where $\mathcal{F}$ is the feasible set defined next.
+
+\subsection{Topographical and engineering constraints}
+
+The feasible set $\mathcal{F}=\mathcal{F}_{1}\cap\mathcal{F}_{2}\cap
+\mathcal{F}_{3}\cap\mathcal{F}_{4}\cap\mathcal{F}_{5}$ encodes the physical and
+regulatory limits.
+
+\begin{description}
+  \item[($\mathcal{F}_{1}$) Land availability / boundary clearance.] Every
+  turbine, including its rotor, must lie inside the buildable domain $\Omega$:
+  \begin{equation}
+    \operatorname{dist}\!\bigl(x_{j}, \partial\Omega\bigr) \ \ge \ R = D/2,
+    \qquad j=1,\dots,N .
+    \label{eq:c-boundary}
+  \end{equation}
+  On real terrain $\Omega$ excludes water bodies, settlements, roads and other
+  protected areas.
+
+  \item[($\mathcal{F}_{2}$) Exclusion zones.] A collection of forbidden
+  polygons $\{Z_{m}\}_{m=1}^{M}$ (buildings, radar cones, archaeological sites)
+  must be avoided:
+  \begin{equation}
+    x_{j} \notin \bigcup_{m=1}^{M} Z_{m},
+    \qquad j=1,\dots,N .
+    \label{eq:c-exclusion}
+  \end{equation}
+
+  \item[($\mathcal{F}_{3}$) Minimum inter-turbine spacing.] To limit wake
+  interference and mechanical loading, turbines must keep a centre-to-centre
+  distance of at least a multiple $\gamma$ of the rotor diameter:
+  \begin{equation}
+    \norm{x_{i}-x_{j}} \ \ge \ s_{\min} = \gamma D,
+    \qquad 1 \le i < j \le N,
+    \label{eq:c-spacing}
+  \end{equation}
+  with typical $\gamma \in [3,8]$.
+  Eq.~\eqref{eq:c-spacing} makes $\mathcal{F}$ \emph{non-convex}: it removes an
+  open neighbourhood around each turbine, effectively carving holes in the
+  domain.
+
+  \item[($\mathcal{F}_{4}$) Terrain and slope.] Turbine foundations require
+  limited ground slope and, for road access, acceptable gradients between
+  positions. A common surrogate bounds the elevation difference relative to the
+  horizontal separation,
+  \begin{equation}
+    \frac{\abs{h(x_{i})-h(x_{j})}}{\norm{x_{i}-x_{j}}}
+      \ \le \ \sigma_{\max},
+    \qquad 1\le i<j\le N ,
+    \label{eq:c-slope}
+  \end{equation}
+  and hub heights are constrained to a permissible band
+  $H_{\min}\le h(x_{j})+H_{0}\le H_{\max}$.
+
+  \item[($\mathcal{F}_{5}$) Discrete/engineering constraints.] Optional
+  restrictions such as a maximum number of turbines along a line, alignment
+  rules, or a grid-snapping of positions to an accessible lattice.
+\end{description}
+
+\subsection{Why the landscape is multimodal, and why trajectory search fits}
+
+The WFLO objective \eqref{eq:objective-wflo} is, for several independent
+reasons, a pathological landscape for gradient-based methods.
+
+\begin{proposition}[Structural difficulties]
+\label{prop:wflo-hard}
+The WFLO objective $\bar{P}$ over $\mathcal{F}$ exhibits the following
+properties.
+\begin{enumerate}
+  \item \textbf{Non-convexity and disconnectedness.} The spacing constraints
+        \eqref{eq:c-spacing} render the feasible set non-convex; it is a union
+        of many disjoint regions in $\R^{2N}$.
+  \item \textbf{Non-separability.} Because of the wake terms $\delta_{ij}$,
+        the contribution of turbine $j$ depends on the positions of all
+        turbines upwind of it. The objective does not decompose into a sum of
+        per-turbine terms, so turbines cannot be optimised independently.
+  \item \textbf{Nonsmoothness.} The indicator condition
+        $y_{ij}\le R_{w}(x_{ij})$ in \eqref{eq:jensen-deficit} introduces a
+        discontinuity in the first derivative of $\bar{P}$ whenever a turbine
+        enters or leaves a wake cone; likewise the $(\cdot)_{+}$ and the
+        piecewise power curve are non-differentiable at their kinks.
+  \item \textbf{Combinatorial multimodality.} Each of the
+        $\binom{N}{2}$ wake interactions contributes a local basin, so the
+        number of local optima grows rapidly with $N$. Good layouts typically
+        arrange turbines in staggered patterns aligned with the dominant wind
+        direction, and distinct wind-rose structures give rise to competing,
+        mutually exclusive configurations.
+\end{enumerate}
+\end{proposition}
+
+Classical nonlinear programming solvers stall on the first local optimum and
+cannot cross the spacing barriers of (F3). This is precisely the regime in
+which \emph{trajectory-based} metaheuristics excel: they treat $\bar{P}$ as a
+black box, they navigate non-convex feasible sets through clever encodings and
+penalties, and their acceptance rules (Metropolis, tabu tenure, perturbation)
+let them escape the numerous local optima catalogued in
+Proposition~\ref{prop:wflo-hard}.
+
+\paragraph{Encoding and neighbourhood.}
+Because the natural variables are continuous, trajectory methods operate
+directly on the coordinate vector $X\in\R^{2N}$. A standard neighbourhood
+perturbs a single turbine,
+\begin{equation}
+  \mathcal{N}_{\text{move}}(X)
+  = \bigl\{\, X + e_{j}\otimes \xi \ : \ 1\le j\le N,\ \xi\sim\mathcal{N}(0,\sigma^{2}I_{2}) \,\bigr\},
+  \label{eq:wflo-neighbourhood}
+\end{equation}
+optionally combined with \emph{swap} moves (exchange two turbines) and
+\emph{block} moves (translate a subset of turbines). Infeasible candidates are
+handled either by rejection, by a repair operator, or by a penalty
+$\lambda\sum_{i<j}[s_{\min}-\norm{x_{i}-x_{j}}]_{+}$.
+
+\paragraph{Reference algorithm.}
+Algorithm~\ref{alg:sa-wflo} instantiates the skeleton with a Metropolis
+acceptance and a geometric cooling schedule $T_{t+1}=\alpha T_{t}$; this is the
+reference metaheuristic against which the baseline hill climber of the
+repository is compared.
+
+\begin{algorithm}[H]
+\caption{Simulated annealing for WFLO (maximisation of $\bar{P}$)}
+\label{alg:sa-wflo}
+\begin{algorithmic}[1]
+\State $X \leftarrow$ \Call{RandomFeasibleLayout}{$N,\Omega$}
+\State $X^{\star} \leftarrow X$;\quad $T \leftarrow T_{0}$
+\While{$T > T_{\text{end}}$ \textbf{and} budget remains}
+  \Repeat
+    \State Draw $X' \in \mathcal{N}_{\text{move}}(X)$ and repair/clip to $\mathcal{F}$
+    \State $\Delta \leftarrow \bar{P}(X') - \bar{P}(X)$
+    \If{$\Delta > 0$ \textbf{or} $\operatorname{rand}() < \exp(\Delta/T)$}
+      \State $X \leftarrow X'$
+      \If{$\bar{P}(X) > \bar{P}(X^{\star})$}
+        \State $X^{\star} \leftarrow X$
+      \EndIf
+    \EndIf
+  \Until{$L$ iterations completed}
+  \State $T \leftarrow \alpha T$
+\EndWhile
+\State \Return $X^{\star}$
+\end{algorithmic}
+\end{algorithm}
+
+%==============================================================================
+\section{Part II --- Dynamic Drone Routing Problem (DDRP)}
+%==============================================================================
+
+\subsection{Motivation and related work}
+
+Unmanned aerial vehicles (drones) are increasingly used for last-mile parcel
+delivery. Dorling et al.~\cite{dorling2016} introduced and studied the
+\emph{Vehicle Routing Problem for drone delivery}, in which a fleet of
+quad-rotor drones, launched from a depot, serves a set of customers under hard
+limits on payload weight and battery energy. Their model demonstrates that the
+cost of a delivery is governed jointly by \emph{distance} and by
+\emph{payload-dependent energy} consumption, so the routing and the loading
+decisions are inseparable.
+
+In the \emph{Dynamic} Drone Routing Problem (DDRP) studied here, delivery
+orders are not known in advance: they are revealed in \emph{real time} over a
+planning horizon. The dispatcher must continuously reassign drones, implying a
+trade-off between exploiting the current plan and re-optimising as new
+information arrives. Dynamic routing of this kind generalises the static
+vehicle-routing problem and is NP-hard \cite{toth2014}; its online nature makes
+it even more challenging \cite{psaraftis1995}.
+
+\subsection{Sets, parameters and decision variables}
+
+\begin{table}[H]
+\centering
+\caption{DDRP data and decision variables.}
+\label{tab:ddrp}
+\begin{tabular}{@{}ll@{}}
+\toprule
+Symbol & Meaning \\
+\midrule
+$\mathcal{K}=\{1,\dots,K\}$      & set of drones \\
+$\mathcal{I}=\{1,\dots,n\}$      & set of delivery orders (customers) \\
+$0$                              & the depot (\emph{departure/return node}) \\
+$V=\{0\}\cup\mathcal{I}$         & node set \\
+$d_{ij}$                         & travel distance between nodes $i,j$ \\
+$w_{i}$                          & payload (parcel weight) of order $i$ \\
+$Q$                              & payload capacity of a drone \\
+$B$                              & usable battery energy of a drone \\
+$a$                              & empty-drone energy consumption per unit distance \\
+$b$                              & payload energy sensitivity per unit distance \\
+$v$                              & cruise speed (distance per unit time) \\
+$\tau$                           & service (hover/landing) time per order \\
+$\lambda$                        & penalty for an unserved order \\
+\addlinespace
+$x_{ijk}\in\{0,1\}$              & $1$ if drone $k$ travels directly from $i$ to $j$ \\
+$y_{ik}\in\{0,1\}$               & $1$ if drone $k$ serves order $i$ \\
+$q_{ijk}\ge 0$                   & payload carried by drone $k$ on arc $(i,j)$ \\
+$t_{ik}\ge 0$                    & (auxiliary) position of node $i$ in route $k$ \\
+$z_{k}\in\{0,1\}$                & $1$ if drone $k$ is used \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\subsection{Payload-dependent battery model}
+
+A multi-rotor's power requirement increases with its total mass, hence with the
+payload it carries. Following the linearisation used by Dorling et al.\
+\cite{dorling2016}, the \emph{energy consumed per unit distance} by a drone
+carrying a payload $q$ is
+\begin{equation}
+  e(q) = a + b\,q, \qquad a \ge 0,\ b \ge 0 ,
+  \label{eq:energy-rate}
+\end{equation}
+so that the energy spent traversing arc $(i,j)$ with payload $q$ is
+$e(q)\,d_{ij}$. The two constants capture the empty-drone consumption $a$ and
+the extra consumption caused by carrying mass ($b\,q$). This dependency is what
+makes DDRP different from a pure distance-minimisation problem: a heavy parcel
+carried far consumes disproportionately more battery.
+
+\subsection{Objective function}
+
+Let $y_{ik}=\sum_{j\in V} x_{ijk}$ indicate whether drone $k$ serves order $i$.
+The problem trades off three quantities: total travelled distance, total energy
+consumed, and the number of orders left unserved. The primary objective
+requested here---\emph{minimise distance and unserved penalties}---reads
+\begin{equation}
+  \boxed{\;
+  \min \ Z(X)
+  = \underbrace{\sum_{k\in\mathcal{K}} \sum_{i\in V} \sum_{j\in V}
+      d_{ij}\, x_{ijk}}_{\text{total travelled distance}}
+  \;+\; \lambda
+    \underbrace{\sum_{i\in\mathcal{I}} \Bigl(1-\sum_{k\in\mathcal{K}} y_{ik}\Bigr)}_{\text{unserved orders}}
+  \;}
+  \label{eq:objective-ddrp}
+\end{equation}
+where $\lambda\gg \max_{ij}d_{ij}$ is chosen large enough that serving an order
+is always preferable to abandoning it, yet finite so that genuinely
+unreachable orders under the battery budget are penalised rather than rendering
+the instance infeasible. If energy is to be priced explicitly (as in
+\cite{dorling2016}), the objective is augmented with
+$c_{e}\sum_{k}\sum_{i,j} (a + b\,q_{ijk})\,d_{ij}\,x_{ijk}$, where $c_{e}$ is
+the cost per unit of energy; we keep the two-term form
+\eqref{eq:objective-ddrp} as the canonical teaching objective.
+
+\subsection{Constraints}
+
+The following constraints are \emph{strict}: no plan may violate them.
+
+\paragraph{(C1) Unique assignment and unserved accounting.}
+Each order is served by at most one drone,
+\begin{equation}
+  \sum_{k\in\mathcal{K}} y_{ik} \ \le \ 1,
+  \qquad i \in \mathcal{I}.
+  \label{eq:ddrp-assign}
+\end{equation}
+
+\paragraph{(C2) Flow conservation and route structure.}
+For every served node the in-degree equals the out-degree, and each used drone
+leaves and re-enters the depot,
+\begin{equation}
+  \sum_{j\in V} x_{ijk} = \sum_{j\in V} x_{jik} = y_{ik},
+  \quad i\in\mathcal{I},\ k\in\mathcal{K};
+  \qquad
+  \sum_{j\in\mathcal{I}} x_{0jk} = \sum_{i\in\mathcal{I}} x_{i0k} = z_{k},
+  \quad k\in\mathcal{K}.
+  \label{eq:ddrp-flow}
+\end{equation}
+
+\paragraph{(C3) Payload capacity.}
+The payload flowing into a customer equals the payload flowing out plus the
+parcel delivered there; the depot loads each drone with exactly the parcels it
+will deliver:
+\begin{align}
+  \sum_{j\in V} q_{ijk} - \sum_{j\in V} q_{jik} &= -\,w_{i}\,y_{ik},
+    & i &\in \mathcal{I},\ k\in\mathcal{K},
+    \label{eq:ddrp-load-balance}\\
+  \sum_{j\in V} q_{0jk} &= \sum_{i\in\mathcal{I}} w_{i}\,y_{ik},
+    & k &\in\mathcal{K},
+    \label{eq:ddrp-depot-load}
+\end{align}
+and the capacity limit holds on every arc and for the whole load,
+\begin{equation}
+  0 \ \le \ q_{ijk} \ \le \ Q\,x_{ijk},
+  \quad i,j\in V,\ k\in\mathcal{K};
+  \qquad
+  \sum_{i\in\mathcal{I}} w_{i}\,y_{ik} \ \le \ Q\,z_{k},
+  \quad k\in\mathcal{K}.
+  \label{eq:ddrp-capacity}
+\end{equation}
+
+\paragraph{(C4) Battery budget.}
+The energy consumed along the whole route, with consumption scaling with
+payload \eqref{eq:energy-rate} and distance, must not exceed the usable battery
+energy,
+\begin{equation}
+  \sum_{i\in V}\sum_{j\in V} \bigl(a + b\,q_{ijk}\bigr)\, d_{ij}\, x_{ijk}
+  \ \le \ B\, z_{k},
+  \qquad k\in\mathcal{K}.
+  \label{eq:ddrp-battery}
+\end{equation}
+In practice one reserves a safety margin $B_{\text{res}}$ for wind, hovering and
+landing, replacing $B$ by $B-B_{\text{res}}$.
+
+\paragraph{(C5) Subtour elimination.}
+Auxiliary order variables with a big-$M$ bound forbid disconnected subtours,
+\begin{equation}
+  t_{ik} - t_{jk} + n\,x_{ijk} \ \le \ n-1,
+  \qquad i,j\in\mathcal{I},\ i\neq j,\ k\in\mathcal{K}.
+  \label{eq:ddrp-mtz}
+\end{equation}
+
+\paragraph{(C6) Release times (dynamic information).}
+An order $i$ with release time $r_{i}$ may be served only once it is known. Let
+$t^{a}_{ik}$ denote the arrival time at order $i$. Then
+\begin{equation}
+  y_{ik} = 1 \ \Rightarrow \ t^{a}_{ik} \ \ge \ r_{i},
+  \label{eq:ddrp-release}
+\end{equation}
+which we linearise via $t^{a}_{ik} \ge r_{i} - M(1-y_{ik})$. Optional time
+windows $[\,\underline{e}_{i},\overline{e}_{i}\,]$ extend this to
+$\underline{e}_{i} \le t^{a}_{ik} \le \overline{e}_{i}$ when $y_{ik}=1$.
+
+\subsection{The dynamic setting}
+
+In DDRP the order set $\mathcal{I}$ is not known a priori. Instead orders
+arrive according to a stochastic process---typically a non-homogeneous Poisson
+process with rate $\nu(t)$ over a horizon $[0,T]$---and each order becomes
+\emph{actionable} at its release time $r_{i}$. The dispatcher observes the
+state
+\[
+  S_{t} = \bigl(\text{positions and remaining batteries of all drones},\
+          \text{served orders},\ \text{pending orders}\bigr)
+\]
+and selects an action: dispatch a drone, insert a customer into an existing
+route, or idle. A \emph{policy} $\pi$ maps states to actions; the Dynamic DDRP
+seeks
+\begin{equation}
+  \min_{\pi} \ \E\Bigl[ \ \sum_{t=0}^{T}
+      \Bigl( \textstyle\sum_{k}\sum_{i,j} d_{ij}\,x_{ijk}^{t}
+             \;+\; \lambda\, U_{t} \Bigr) \ \Bigr],
+  \label{eq:ddrp-dynamic}
+\end{equation}
+where $U_{t}$ is the number of still-unserved, already-released orders at epoch
+$t$. The expectation is taken over the (unknown) arrival process.
+
+A tractable and widely used approach is \emph{rolling-horizon
+re-optimisation}: at each decision epoch $\Delta$ the dispatcher solves a
+\emph{static} instance consisting of all pending orders plus new arrivals, with
+the drones' current positions, remaining payload and remaining battery as
+initial conditions, and commits to the first portion of the plan before
+re-optimising at the next epoch. This decomposition turns the online problem
+into a sequence of offline DDRP instances, each solvable by the trajectory
+metaheuristics of Section~\ref{sec:ddrp-meta}.
+
+\subsection{Trajectory metaheuristics for the DDRP}
+\label{sec:ddrp-meta}
+
+\paragraph{Encoding.}
+A convenient single-solution encoding is the \emph{giant tour}: a permutation
+of the orders, split optimally (by dynamic programming) into $K$ feasible
+drone routes. The split respects capacity~\eqref{eq:ddrp-capacity} and
+battery~\eqref{eq:ddrp-battery} and is recomputed after every move. Unserved
+orders are simply those the split cannot place, and are charged $\lambda$ in
+\eqref{eq:objective-ddrp}.
+
+\paragraph{Neighbourhoods.}
+Classic VRP moves operate on the permutation:
+\begin{itemize}
+  \item \textbf{relocate} --- remove one order and reinsert it elsewhere;
+  \item \textbf{exchange} --- swap two orders;
+  \item \textbf{Or-opt} --- move a chain of $2$ or $3$ consecutive orders;
+  \item \textbf{2-opt} --- reverse a segment, useful within a route.
+\end{itemize}
+
+\begin{algorithm}[H]
+\caption{Tabu search for the (static) DDRP}
+\label{alg:ts-ddrp}
+\begin{algorithmic}[1]
+\State $s \leftarrow$ \Call{CheapestInsertion}{pending orders}
+\State $s^{\star} \leftarrow s$;\quad $\mathcal{T} \leftarrow \emptyset$
+\While{stopping criterion not met}
+  \State $s' \leftarrow \argmin_{\hat{s}\in\mathcal{N}(s)} \{ Z(\hat{s}) : \text{move}(\hat{s}) \notin \mathcal{T} \}$
+  \If{$s'$ is tabu but $Z(s') < Z(s^{\star})$} \Comment{aspiration}
+      \State release $s'$ from $\mathcal{T}$
+  \EndIf
+  \State $s \leftarrow s'$;\quad insert the reverse move into $\mathcal{T}$ with tenure $\theta$
+  \If{$Z(s) < Z(s^{\star})$}
+      \State $s^{\star} \leftarrow s$
+  \EndIf
+\EndWhile
+\State \Return $s^{\star}$
+\end{algorithmic}
+\end{algorithm}
+
+\paragraph{Why trajectory methods suit the dynamic setting.}
+Trajectory methods are the natural choice for DDRP because (i) they are
+\emph{anytime}, so the dispatcher can halt them when a new order arrives and
+use the best solution available; (ii) they \emph{warm-start} trivially, by
+seeding the search with the previous plan so that real-time re-optimisation
+inherits past effort; and (iii) the giant-tour representation admits cheap,
+incremental evaluation of relocate/exchange moves. This closes the conceptual
+circle opened in the introduction: the same skeleton of
+Algorithm~\ref{alg:generic} serves both the continuous, multiplication-of-wakes
+landscape of Part~I and the discrete, payload-and-battery-constrained routing
+of Part~II.
+
+%==============================================================================
+\section{Synthesis}
+%==============================================================================
+
+Table~\ref{tab:synthesis} contrasts the two problems. Despite their different
+mathematical natures---one continuous, one combinatorial---both are
+constrained, black-box and multimodal, and both are attacked in the MetaLab
+Suite with the same family of trajectory-based metaheuristics, instantiated
+with problem-specific encodings and neighbourhoods.
+
+\begin{table}[H]
+\centering
+\caption{Comparison of the two problems.}
+\label{tab:synthesis}
+\begin{tabular}{@{}p{3.1cm}p{5.3cm}p{5.3cm}@{}}
+\toprule
+Aspect & WFLO (Part~I) & DDRP (Part~II) \\
+\midrule
+Decision            & continuous turbine coordinates $X\in\R^{2N}$
+                    & discrete routes and assignments \\
+Objective           & maximise $\bar{P}(X)$ / AEP
+                    & minimise distance $+\ \lambda\,(\text{unserved})$ \\
+Key physics/economics & Jensen wake deficit; wind rose
+                    & payload-dependent battery $e(q)=a+bq$ \\
+Hard constraints    & boundary, exclusion, spacing, slope
+                    & capacity $Q$, battery $B$, precedence, release times \\
+Source of multimodality & wake coupling; non-convex feasible set
+                    & NP-hard routing; online arrivals \\
+Trajectory method   & simulated annealing / tabu on coordinates
+                    & tabu search / ILS on the giant tour \\
+Special property    & derivative-free, nonsmooth objective
+                    & \emph{anytime}, warm-startable for re-optimisation \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+%==============================================================================
+\begin{thebibliography}{99}
+
+\bibitem{dorling2016}
+K.~Dorling, J.~Heinrichs, G.~G.~Messier, and S.~Magierowski,
+``Vehicle routing problems for drone delivery,''
+\emph{IEEE Transactions on Systems, Man, and Cybernetics: Systems},
+vol.~47, no.~1, pp.~70--85, 2017 (available online 2016).
+
+\bibitem{jensen1983}
+N.~O.~Jensen,
+``A note on wind generator interaction,''
+Ris\o{} National Laboratory, Roskilde, Denmark, Tech.\ Rep.\ Ris\o-M-2411, 1983.
+
+\bibitem{katic1986}
+I.~Kati\'c, J.~H\o{}jstrup, and N.~O.~Jensen,
+``A simple model for cluster efficiency,''
+in \emph{Proc.\ European Wind Energy Association Conference and Exhibition},
+Rome, Italy, 1986, pp.~407--410.
+
+\bibitem{kirkpatrick1983}
+S.~Kirkpatrick, C.~D.~Gelatt, and M.~P.~Vecchi,
+``Optimization by simulated annealing,''
+\emph{Science}, vol.~220, no.~4598, pp.~671--680, 1983.
+
+\bibitem{glover1989}
+F.~Glover,
+``Tabu search---Part I,''
+\emph{ORSA Journal on Computing}, vol.~1, no.~3, pp.~190--206, 1989.
+
+\bibitem{lourenco2003}
+H.~R.~Louren\c{c}o, O.~C.~Martin, and T.~St\"utzle,
+``Iterated local search,''
+in \emph{Handbook of Metaheuristics}, F.~Glover and G.~A.~Kochenberger, Eds.
+Boston, MA: Springer, 2003, pp.~320--353.
+
+\bibitem{mosetti1994}
+G.~Mosetti, C.~Poloni, and B.~Diviacco,
+``Optimization of wind turbine positioning in large wind farms by means of a
+genetic algorithm,''
+\emph{Journal of Wind Engineering and Industrial Aerodynamics},
+vol.~51, no.~1, pp.~105--116, 1994.
+
+\bibitem{grady2005}
+S.~A.~Grady, M.~Y.~Hussaini, and M.~M.~Abdullah,
+``Placement of wind turbines using genetic algorithms,''
+\emph{Renewable Energy}, vol.~30, no.~2, pp.~259--270, 2005.
+
+\bibitem{toth2014}
+P.~Toth and D.~Vigo, Eds.,
+\emph{Vehicle Routing: Problems, Methods, and Applications}, 2nd ed.
+Philadelphia, PA: SIAM, 2014.
+
+\bibitem{psaraftis1995}
+H.~N.~Psaraftis,
+``Dynamic vehicle routing: Status and prospects,''
+\emph{Annals of Operations Research}, vol.~61, no.~1, pp.~143--164, 1995.
+
+\bibitem{bent2004}
+R.~W.~Bent and P.~Van Hentenryck,
+``Scenario-based planning for partially dynamic vehicle routing with stochastic
+customers,''
+\emph{Operations Research}, vol.~52, no.~6, pp.~977--987, 2004.
+
+\bibitem{ropke2006}
+S.~Ropke and D.~Pisinger,
+``An adaptive large neighborhood search heuristic for the pickup and delivery
+problem with time windows,''
+\emph{Transportation Science}, vol.~40, no.~4, pp.~455--472, 2006.
+
+\end{thebibliography}
+
+\end{document}
