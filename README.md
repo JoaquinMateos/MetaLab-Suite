@@ -45,13 +45,15 @@ Each problem has its own standalone PDF in [`docs/`](docs/):
 | --- | --- | --- |
 | [`wind_farm_layout_optimization.pdf`](docs/wind_farm_layout_optimization.pdf) | assignment | WFLO theory: terrain & exclusions, simplified Jensen wake model, objective (no worked algorithm) |
 | [`dynamic_drone_routing.pdf`](docs/dynamic_drone_routing.pdf) | advanced | the Dynamic Drone Routing Problem (Dorling et al., 2016): objective, capacity/battery constraints, rolling-horizon and tabu search |
+| [`multimodal_continuous_optimization.pdf`](docs/multimodal_continuous_optimization.pdf) | assignment | the multimodal-terrain family, the hidden signal, the distance objective and the evaluation budget |
 
 To rebuild the PDFs (needs a LaTeX distribution):
 
 ```bash
 cd docs
-pdflatex wind_farm_layout_optimization.tex && pdflatex wind_farm_layout_optimization.tex
-pdflatex dynamic_drone_routing.tex          && pdflatex dynamic_drone_routing.tex
+pdflatex wind_farm_layout_optimization.tex   && pdflatex wind_farm_layout_optimization.tex
+pdflatex dynamic_drone_routing.tex           && pdflatex dynamic_drone_routing.tex
+pdflatex multimodal_continuous_optimization.tex && pdflatex multimodal_continuous_optimization.tex
 ```
 
 ---
@@ -109,7 +111,8 @@ MetaLab Suite/
 ├── LICENSE                        # MIT
 ├── docs/                          # one LaTeX source + PDF per problem
 │   ├── wind_farm_layout_optimization.tex/.pdf   # assignment (theory)
-│   └── dynamic_drone_routing.tex/.pdf           # advanced
+│   ├── dynamic_drone_routing.tex/.pdf           # advanced
+│   └── multimodal_continuous_optimization.tex/.pdf
 ├── src/
 │   └── metalab/                   # shared, problem-agnostic helpers
 │       ├── __init__.py

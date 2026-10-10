@@ -4,7 +4,11 @@
 > A sensor swarm must triangulate the strongest rescue signal in a continuous,
 > multimodal terrain full of false positives.
 
-This folder is a **self-contained assignment**. The **environment engine**, the
+This folder is a **self-contained assignment**. The **theory** (the
+multimodal-terrain family, the hidden signal, the distance objective and the
+evaluation budget) is in the companion document
+[`../docs/multimodal_continuous_optimization.pdf`](../docs/multimodal_continuous_optimization.pdf);
+**this README is the technical guide**. The **environment engine**, the
 **instance generator**, a **black-box student API**, a **random search** and a
 **terminal test harness** are provided; the **population-based metaheuristic is
 your task**.

@@ -1,0 +1,270 @@
+%==============================================================================
+%  MetaLab Suite --- Problem #3
+%  Population-based Multimodal Continuous Optimization: assignment (theory)
+%
+%  Companion technical guide: multimodal_continuous_optimization/README.md
+%  Compile with:  pdflatex multimodal_continuous_optimization.tex  (twice)
+%==============================================================================
+\documentclass[11pt,a4paper]{article}
+
+\usepackage[T1]{fontenc}
+\usepackage[utf8]{inputenc}
+\usepackage{lmodern}
+\usepackage[margin=2.5cm]{geometry}
+\usepackage{amsmath,amssymb,amsthm,mathtools}
+\usepackage{booktabs}
+\usepackage{array}
+\usepackage{float}
+\usepackage{xcolor}
+\usepackage{microtype}
+\usepackage[hidelinks]{hyperref}
+
+\newtheorem{remark}{Remark}
+\newcommand{\R}{\mathbb{R}}
+\newcommand{\norm}[1]{\left\lVert #1 \right\rVert}
+\DeclareMathOperator*{\argmin}{arg\,min}
+\DeclareMathOperator*{\argmax}{arg\,max}
+
+\title{%
+  \textbf{Population-based Multimodal Continuous Optimization}\\[2mm]
+  \large Assignment --- Theoretical Base}
+\author{%
+  MetaLab Suite\\[1mm]
+  \small Problem \#3}
+\date{\today}
+
+%==============================================================================
+\begin{document}
+\maketitle
+
+\begin{abstract}
+\noindent
+A swarm of sensors must triangulate the \textbf{strongest rescue signal} over a
+continuous, ``n``-dimensional terrain riddled with \textbf{false positives}
+(local optima). The terrain is a classic multimodal benchmark function, shifted
+so that its single global optimum --- the real signal --- sits at a random
+location. The scarce resource is \emph{not time}: it is the
+\textbf{evaluation budget}. Every call to the terrain consumes one evaluation;
+the environment counts them and cuts (or penalises) any call beyond the limit.
+This document defines the problem; the technical instructions for running the
+environment, the black-box solver interface and the autograder are in the
+companion guide \texttt{multimodal\_continuous\_optimization/README.md}.
+\end{abstract}
+
+\tableofcontents
+
+%==============================================================================
+\section{Assignment brief}
+%==============================================================================
+
+The sensors can query the terrain at any point and read a scalar value: the
+\textbf{terrain cost}. They never see the mathematical function, its name, its
+gradient or the location of the signal --- only the value they measure. The goal
+is to report, as accurately as possible, the \textbf{coordinates of the strongest
+signal} (the global optimum), using \textbf{at most} a fixed number of
+evaluations.
+
+You must implement \textbf{one population-based metaheuristic} (Differential
+Evolution, Particle Swarm Optimization, a Genetic Algorithm, CMA-ES, Artificial
+Bee Colony, \dots) that operates through the black-box callback alone. The only
+algorithm supplied is a plain random search.
+
+%==============================================================================
+\section{The search space}
+%==============================================================================
+
+The domain is the axis-aligned box
+\begin{equation}
+  \mathcal{X} = [L, U]^{n} \subset \R^{n},
+  \qquad L < U,
+  \label{eq:domain}
+\end{equation}
+where the dimension $n$ and the bounds $(L, U)$ depend on the instance (e.g.\
+$n = 2$ with $[L,U] = [-5.12, 5.12]$ for the \emph{toy} terrain, $n = 10$ with
+$[-500, 500]$ for the \emph{hard} one). A \emph{candidate} is a point
+$x \in \mathcal{X}$; the swarm must decide which points to query.
+
+%==============================================================================
+\section{The terrain: a family of classic multimodal functions}
+%==============================================================================
+
+The terrain is one member $f : \R^{n} \to \R$ of a family of \textbf{classic
+multimodal benchmark functions}. Each has a single global minimum surrounded by
+many local minima --- the false positives that lure a myopic search. Three
+representatives are
+\begin{align}
+  f_{\text{ras}}(x) &= 10n + \sum_{i=1}^{n}\Bigl(x_{i}^{2}
+      - 10\cos(2\pi x_{i})\Bigr),
+      && \text{(Rastrigin)}\\[1mm]
+  f_{\text{ack}}(x) &= -20\exp\!\Bigl(-0.2\sqrt{\tfrac1n\textstyle\sum_i x_i^2}\Bigr)
+      - \exp\!\Bigl(\tfrac1n\textstyle\sum_i\cos(2\pi x_i)\Bigr) + 20 + e,
+      && \text{(Ackley)}\\[1mm]
+  f_{\text{sch}}(x) &= 418.9829\,n - \sum_{i=1}^{n} x_{i}\sin\!\bigl(\sqrt{|x_{i}|}\bigr).
+      && \text{(Schwefel)}
+\end{align}
+Table~\ref{tab:functions} lists the family the instances are drawn from, with the
+canonical bounds and the \emph{canonical} optimum $x^{\mathrm{c}}$ (the argmin in
+the function's own frame) and its value $f(x^{\mathrm{c}})$.
+
+\begin{table}[H]
+\centering
+\caption{The multimodal family used to build terrains.}
+\label{tab:functions}
+\begin{tabular}{@{}llcc@{}}
+\toprule
+Function & Domain & Canonical argmin $x^{\mathrm{c}}$ & $f(x^{\mathrm{c}})$ \\
+\midrule
+Rastrigin          & $[-5.12, 5.12]$      & $0$        & $0$ \\
+Ackley             & $[-32.768, 32.768]$  & $0$        & $0$ \\
+Griewank           & $[-600, 600]$        & $0$        & $0$ \\
+Schwefel           & $[-500, 500]$        & $420.9687$ & $0$ \\
+Levy               & $[-10, 10]$          & $1$        & $0$ \\
+Styblinski--Tang   & $[-5, 5]$            & $-2.9035$  & $-39.166\,n$ \\
+Drop-Wave (2-D)    & $[-5.12, 5.12]$      & $0$        & $-1$ \\
+Schaffer N.2 (2-D) & $[-100, 100]$        & $0$        & $0$ \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+%==============================================================================
+\section{The hidden signal: shifting the terrain}
+%==============================================================================
+
+To hide the answer, the terrain is \emph{shifted} so that its global optimum
+lands at a random location $x^{\star}$ (the \textbf{signal}). Given the canonical
+argmin $x^{\mathrm{c}}$, the environment evaluates
+\begin{equation}
+  g(x) = f\bigl(x - x^{\star} + x^{\mathrm{c}}\bigr),
+  \qquad\text{so that}\qquad
+  g(x^{\star}) = f(x^{\mathrm{c}}) = \min_{x \in \mathcal{X}} g(x),
+  \label{eq:shift}
+\end{equation}
+where $x^{\star}$ is drawn uniformly from the interior of the box (kept a margin
+away from the boundary). A candidate is scored by $g$, and the coordinates the
+swarm reports are compared against the hidden $x^{\star}$.
+
+\begin{remark}[Domain-limited functions]
+A few functions are bounded below only on their canonical box --- most notably
+\textbf{Schwefel}, which diverges to $-\infty$ outside $[-500, 500]$. Such
+functions are \emph{not} shifted ($x^{\star} = x^{\mathrm{c}}$); otherwise the
+``global optimum'' would drift to the boundary. The generator enforces this, so
+every instance is well posed: $g(x^{\star})$ is always the true minimum.
+\end{remark}
+
+%==============================================================================
+\section{The objective}
+%==============================================================================
+
+``Strongest signal'' means \emph{lowest terrain cost}: the environment returns
+$g(x)$, and the swarm must \textbf{minimise} it. Equivalently, the signal
+strength is $-g(x)$ and the false positives are the local minima of $g$. The
+quality of a run is measured by the \textbf{distance} between the reported
+coordinates and the hidden signal,
+\begin{equation}
+  \text{error} = \frac{\norm{\hat{x} - x^{\star}}}{\sqrt{n}\,(U - L)} \in [0, 1],
+  \label{eq:error}
+\end{equation}
+normalised so that $0$ is a perfect hit and $1$ is the worst point in the box.
+
+%==============================================================================
+\section{The constraint: the evaluation budget}
+%==============================================================================
+
+Unlike a simulation-time problem, there is \emph{no clock} inside the model. The
+single scarce resource is the number of evaluations
+\begin{equation}
+  \boxed{\; \sum_{k} \mathbf{1}\{\text{the swarm queries the terrain}\} \;\le\; B \;}
+  \label{eq:budget}
+\end{equation}
+for an instance-dependent budget $B$ (e.g.\ $B = 2\,000$ for \emph{toy},
+$B = 100\,000$ for \emph{hard}). The environment is the referee:
+
+\begin{itemize}
+  \item every call to the terrain \textbf{counts} one evaluation;
+  \item once the budget is spent, a further call is \textbf{cut} (the environment
+        raises and the run is aborted) or \textbf{penalised} (a large constant is
+        returned), depending on the mode;
+  \item either way the run is flagged \textbf{invalid}, so exceeding the budget
+        can never beat an honest run.
+\end{itemize}
+
+\begin{remark}[Why this is the hard part]
+A large budget rewards methods that \emph{use it well}, not those that iterate
+most: a population that balances exploration (to leave a false positive) and
+exploitation (to refine the signal) will triangulate the optimum long before a
+random sampler or a trajectory method would.
+\end{remark}
+
+%==============================================================================
+\section{What you are given}
+%==============================================================================
+
+The following are provided (see the companion guide for the exact commands):
+
+\begin{itemize}
+  \item the \textbf{environment engine} (\texttt{given/simulator\_mmco.py}),
+  which builds the terrain, exposes the black-box evaluation and enforces the
+  budget;
+  \item the \textbf{instance generator}
+  (\texttt{given/generate\_instances\_mmco.py}), which builds the \texttt{toy}
+  and \texttt{hard} terrains and guarantees they are well posed;
+  \item a \textbf{black-box student API} (\texttt{student\_mmco.py}) whose only
+  window onto the terrain is the callback \texttt{evaluate(coords)};
+  \item the \textbf{only algorithm supplied}, a random search
+  (\texttt{random\_search\_mmco.py});
+  \item a \textbf{terminal test harness} (\texttt{run\_local.py}) and the
+  \textbf{autograder backend} (\texttt{autograder/}).
+\end{itemize}
+
+%==============================================================================
+\section{Deliverables}
+%==============================================================================
+
+\begin{enumerate}
+  \item A population-based metaheuristic that finds the signal \textbf{within the
+  budget}, using only the black-box callback.
+  \item Results for the \texttt{toy} and \texttt{hard} terrains: best coordinates,
+  the error~\eqref{eq:error}, the evaluations used and the convergence curve.
+  \item A short discussion of the exploration/exploitation balance under a fixed
+  evaluation budget.
+\end{enumerate}
+
+%==============================================================================
+\begin{thebibliography}{9}
+
+\bibitem{ackley1987}
+D.~H.~Ackley,
+\emph{A Connectionist Machine for Genetic Hillclimbing}.
+Boston, MA: Kluwer Academic Publishers, 1987.
+
+\bibitem{kennedy1995}
+J.~Kennedy and R.~Eberhart,
+``Particle swarm optimization,''
+in \emph{Proc.\ IEEE International Conference on Neural Networks}, 1995,
+pp.~1942--1948.
+
+\bibitem{storn1997}
+R.~Storn and K.~Price,
+``Differential evolution --- a simple and efficient heuristic for global
+optimization over continuous spaces,''
+\emph{Journal of Global Optimization}, vol.~11, no.~4, pp.~341--359, 1997.
+
+\bibitem{karaboga2007}
+D.~Karaboga and B.~Basturk,
+``A powerful and efficient algorithm for numerical function optimization:
+artificial bee colony (ABC) algorithm,''
+\emph{Journal of Global Optimization}, vol.~39, no.~3, pp.~459--471, 2007.
+
+\bibitem{hansen2001}
+N.~Hansen and A.~Ostermeier,
+``Completely derandomized self-adaptation in evolution strategies,''
+\emph{Evolutionary Computation}, vol.~9, no.~2, pp.~159--195, 2001.
+
+\bibitem{talbi2009}
+E.-G.~Talbi,
+\emph{Metaheuristics: From Design to Implementation}.
+Hoboken, NJ: John Wiley \& Sons, 2009.
+
+\end{thebibliography}
+
+\end{document}
