@@ -34,7 +34,8 @@ multimodal_continuous_optimization/
 ├── README.md                          # this guide
 ├── __init__.py
 ├── student_mmco.py                    # YOUR file: BaseSolver (black box) + MySolver skeleton
-├── hill_climbing_mmco.py              # the ONLY algorithm given (gets stuck in a local optimum)
+├── hill_climbing_mmco.py              # baseline example (gets stuck in a local optimum)
+├── pso_mmco.py                        # starter kit: PSO (+ an ABC adaptation guide)
 ├── run_local.py                       # terminal test harness
 ├── instances/                         # toy.json, hard.json (git-ignored)
 ├── solutions/                         # your outputs (git-ignored)
@@ -107,13 +108,16 @@ evaluations carefully. Implement `solve` to return the best point found.
 
 ---
 
-## 5. The baseline: hill climbing (and why it fails)
+## 5. Provided algorithms
 
-`hill_climbing_mmco.py` provides the **only algorithm you are given**,
-`HillClimbingSolver`. It perturbs a single point with a Gaussian step and keeps
-the move only if it improves — a textbook trajectory method. It **demonstrates
-the failure mode**: it climbs the nearest basin and then gets **stuck in a local
-optimum** (a false positive), wasting the rest of the budget.
+Two worked examples ship with the assignment.
+
+### 5.1 The baseline: hill climbing (and why it fails)
+
+`hill_climbing_mmco.py` provides `HillClimbingSolver`, a textbook trajectory
+method. It perturbs a single point and keeps the move only if it improves, so it
+**climbs the nearest basin and gets stuck in a local optimum** (a false
+positive), wasting the rest of the budget.
 
 ```bash
 uv run python multimodal_continuous_optimization/run_local.py \
@@ -121,7 +125,30 @@ uv run python multimodal_continuous_optimization/run_local.py \
 ```
 
 Typical output on `toy`: a **gap** of ≈ 1.0 to the true signal, `hit=False`.
-Beating this gap reliably is your job.
+
+### 5.2 The starter kit: Particle Swarm Optimization
+
+`pso_mmco.py` provides `PSOSolver(BaseSolver)` --- a clear, **deliberately
+un-tuned** PSO skeleton that applies the textbook theory:
+
+* one vector per particle for **position**, **velocity** and **personal best**,
+  plus the swarm's **global best**;
+* the velocity update balancing **inertia + cognitive + social** information
+  (`w`, `c1`, `c2`);
+* **bounds handling** that keeps every particle inside the search space.
+
+It is heavily commented so you can tune it --- or reshape it into an **Artificial
+Bee Colony (ABC)**; the employed / onlooker / scout recipe is written at the
+bottom of the file.
+
+```bash
+uv run python multimodal_continuous_optimization/run_local.py --solver pso
+uv run python multimodal_continuous_optimization/run_local.py --solver pso \
+    --instance multimodal_continuous_optimization/instances/hard.json
+```
+
+On the `toy` terrain PSO reaches the signal (**gap ≈ 0**, `hit=True`), while hill
+climbing stalls at gap ≈ 1.0 --- a first taste of why population methods win.
 
 ---
 

@@ -73,14 +73,20 @@ def _build(
     tolerance: float,
     seed: int,
 ) -> Instance:
-    lower, upper = FUNCTIONS[function].bounds
+    spec = FUNCTIONS[function]
+    lower, upper = spec.bounds
     rng = np.random.default_rng(seed)
+    if spec.shiftable:
+        optimum = place_optimum(rng, lower, upper, dimension)
+    else:
+        # Domain-limited functions (e.g. Schwefel) must not be shifted.
+        optimum = [float(spec.argmin)] * dimension
     instance = Instance(
         name=name,
         function=function,
         dimension=dimension,
         bounds=(lower, upper),
-        optimum=place_optimum(rng, lower, upper, dimension),
+        optimum=optimum,
         max_evaluations=max_evaluations,
         tolerance=tolerance,
         seed=seed,

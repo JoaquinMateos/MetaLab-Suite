@@ -39,6 +39,7 @@ from multimodal_continuous_optimization.given.simulator_mmco import (  # noqa: E
     SignalEnvironment,
 )
 from multimodal_continuous_optimization.hill_climbing_mmco import HillClimbingSolver  # noqa: E402
+from multimodal_continuous_optimization.pso_mmco import PSOSolver  # noqa: E402
 from multimodal_continuous_optimization.student_mmco import (  # noqa: E402
     BaseSolver,
     BudgetExhausted,
@@ -51,6 +52,7 @@ DEFAULT_SOLUTIONS_DIR = HERE / "solutions"
 
 KNOWN_SOLVERS: dict[str, type[BaseSolver]] = {
     "hill_climbing": HillClimbingSolver,
+    "pso": PSOSolver,
     "student": MySolver,
     "my_solver": MySolver,
 }

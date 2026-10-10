@@ -40,6 +40,7 @@ from multimodal_continuous_optimization.given.simulator_mmco import (
     SignalEnvironment,
 )
 from multimodal_continuous_optimization.hill_climbing_mmco import HillClimbingSolver
+from multimodal_continuous_optimization.pso_mmco import PSOSolver
 from multimodal_continuous_optimization.student_mmco import (
     BaseSolver,
     BudgetExhausted,
@@ -372,3 +373,37 @@ def test_mmco_scoring_distance_and_penalty() -> None:
     assert per_instance["exact"] == 0.0
     assert per_instance["cheat"] == SEVERE_PENALTY
     assert score == SEVERE_PENALTY / 2
+
+
+def _solve(instance, solver_cls, **kwargs):
+    env = SignalEnvironment(instance)
+    solver = solver_cls(env.evaluate, instance.dimension, instance.lower, instance.upper,
+                        instance.max_evaluations, seed=0, **kwargs)
+    best = solver.solve()
+    return env, solver, best
+
+
+def test_mmco_pso_solves_toy_within_budget() -> None:
+    instance = build_mmco("toy", seed=0)
+    env, solver, best = _solve(instance, PSOSolver)
+    assert solver.queries <= instance.max_evaluations
+    assert len(best) == instance.dimension
+    assert all(instance.lower <= v <= instance.upper for v in best)
+    assert env.report()["hit"]  # PSO reaches the signal on the toy terrain
+
+
+def test_mmco_pso_beats_hill_climbing_on_toy() -> None:
+    instance = build_mmco("toy", seed=0)
+    env_pso, _solver, _best = _solve(instance, PSOSolver)
+    env_hc, _solver, _best = _solve(instance, HillClimbingSolver)
+    assert env_pso.report()["gap"] < env_hc.report()["gap"]
+
+
+def test_mmco_shifted_functions_are_well_posed() -> None:
+    # Every instance's optimum must actually evaluate to the reported minimum,
+    # i.e. no function may be shifted outside its valid domain.
+    for name in ("toy", "hard"):
+        instance = build_mmco(name, seed=0)
+        env = SignalEnvironment(instance)
+        value = env.evaluate(instance.optimum)
+        assert abs(value - env.optimum_value) < 1e-9

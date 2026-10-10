@@ -119,13 +119,17 @@ class FunctionSpec:
     bounds: tuple[float, float]
     argmin: float  # canonical optimum coordinate (applied to every dimension)
     dimension: int | None = None  # fixed dimension, or ``None`` for any ``n``
+    shiftable: bool = True  # can the terrain be shifted to a random optimum?
 
 
 FUNCTIONS: dict[str, FunctionSpec] = {
     "rastrigin": FunctionSpec("rastrigin", rastrigin, (-5.12, 5.12), 0.0),
     "ackley": FunctionSpec("ackley", ackley, (-32.768, 32.768), 0.0),
     "griewank": FunctionSpec("griewank", griewank, (-600.0, 600.0), 0.0),
-    "schwefel": FunctionSpec("schwefel", schwefel, (-500.0, 500.0), 420.968746),
+    # Schwefel is only bounded below on its canonical [-500, 500] box, so its
+    # optimum stays at the canonical argmin (it must NOT be shifted).
+    "schwefel": FunctionSpec("schwefel", schwefel, (-500.0, 500.0), 420.968746,
+                             shiftable=False),
     "levy": FunctionSpec("levy", levy, (-10.0, 10.0), 1.0),
     "styblinski_tang": FunctionSpec("styblinski_tang", styblinski_tang, (-5.0, 5.0), -2.903534),
     "drop_wave": FunctionSpec("drop_wave", drop_wave, (-5.12, 5.12), 0.0, dimension=2),

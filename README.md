@@ -134,7 +134,8 @@ MetaLab Suite/
 │   └── autograder/                # Codabench ingestion.py + score.py
 └── multimodal_continuous_optimization/   # Problem #3 — budget-constrained optimization
     ├── student_mmco.py            # YOUR FILE: BaseSolver (black box) + MySolver
-    ├── hill_climbing_mmco.py      # the ONLY algorithm given (gets stuck locally)
+    ├── hill_climbing_mmco.py      # baseline example (gets stuck locally)
+    ├── pso_mmco.py                # starter kit: PSO (+ ABC adaptation guide)
     ├── run_local.py               # terminal test harness
     ├── README.md                  # technical guide
     ├── instances/  solutions/     # data / your outputs (git-ignored)
