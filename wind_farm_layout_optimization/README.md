@@ -1,178 +1,149 @@
-# 🌀 Wind Farm Layout Optimization (WFLO)
+# 🌀 Wind Farm Layout Optimization — Assignment
 
-> **MetaLab Suite · Problem #1**
-> A trajectory-based metaheuristic playground for micro-siting wind turbines.
+> **MetaLab Suite · Problem #1 · student assignment**
+> Place turbines to maximise expected power while mitigating the wake effect.
 
-> **New to metaheuristics?** Start with the beginner edition in
-> [`starter/`](starter/README.md) — a simplified grid model where you implement
-> your very first hill climber.
+This folder is a **self-contained assignment**. The **theory** (model, wake
+physics, objective and constraints) is in the companion document
+[`../docs/wind_farm_layout_optimization.pdf`](../docs/wind_farm_layout_optimization.pdf).
+**This README is the technical guide**: it explains the files and the exact
+`uv run …` commands you need to generate instances and evaluate layouts.
 
----
-
-## 1. Problem context
-
-A wind farm is a square plot of land. We must decide **where to place `N`
-turbines** inside it so that the farm produces as much electrical energy as
-possible over a typical year.
-
-The twist is the **wake effect**: a turbine extracts energy from the wind and
-leaves a slower, turbulent wake behind it. Any turbine standing inside that
-wake produces less than it otherwise would. Placing turbines far apart reduces
-wake losses but wastes land; packing them together increases losses. This
-trade-off makes the layout problem a genuine, continuous, non-convex
-optimisation problem — a classic testbed for metaheuristics.
-
-### Model in one paragraph
-
-* The farm is the square `[0, side] × [0, side]` metres.
-* A **wind rose** describes the climate as a set of `WindScenario`s, each with
-  a direction (the bearing the wind blows *towards*), a free-stream speed and a
-  probability. Probabilities sum to 1.
-* Each turbine's electrical power is given by a cubic **power curve** between
-  the cut-in, rated and cut-out speeds.
-* The **Jensen top-hat wake model** estimates the speed deficit every turbine
-  sees, given the turbines upstream of it along the wind direction.
-* **Objective (maximised):** the *Expected Annual Energy Production* (`aep_gwh`),
-  i.e. the probability-weighted farm power times 8760 h/yr.
-* **Constraint:** turbines must keep a minimum centre-to-centre spacing
-  (default `4` rotor diameters) and stay inside the farm.
-
-### Why it is a good teaching example
-
-* Purely continuous variables → easy to visualise as points on a plane.
-* Deceptive landscape → hill climbing gets trapped; annealing and tabu search
-  shine.
-* Fast, deterministic evaluation → thousands of iterations run in seconds.
+> **You are given the simulator and the instance generator. Your job is to write
+> the metaheuristic.** The only algorithm provided is a deliberately weak
+> random-search example, so you can see how to call the simulator.
 
 ---
 
-## 2. Folder structure
+## 1. The task in one paragraph
+
+Choose the positions of `N` turbines inside a buildable **terrain polygon**,
+avoiding the **exclusion zones** and respecting a **minimum spacing**. For every
+scenario of the **wind rose**, upwind turbines slow the wind that reaches the
+turbines behind them (simplified **Jensen wake model**), and each turbine turns
+its (reduced) wind speed into power through a cubic curve. You must
+**maximise the expected power** over the whole wind rose. See the PDF for the
+complete formulation.
+
+---
+
+## 2. Files
 
 ```
 wind_farm_layout_optimization/
-├── __init__.py          # marks the folder as a Python package
-├── model.py             # instance data model + Jensen wake + objective
-├── generator.py         # instance generator (writes JSON to instances/)
-├── solver.py            # baseline: stochastic hill climbing (trajectory method)
-├── app.py               # Streamlit GUI
-├── README.md            # this file
-├── instances/           # generated instances (*.json, git-ignored)
-└── solutions/           # solver outputs  (*.json, git-ignored)
+├── simulator_wflo.py           # GIVEN — WindFarmEnvironment (the ground truth)
+├── generate_instances_wflo.py  # GIVEN — builds the 'toy' and 'hard' instances
+├── example_random_search.py    # GIVEN — the only algorithm (a mere example)
+├── README.md                   # this technical guide
+├── instances/                  # generated instances: toy.json, hard.json
+├── solutions/                  # where your solver should write its layouts
+└── starter/                    # optional warm-up: a tiny grid-based exercise
 ```
 
-### Key modules
-
-| File | Responsibility |
+| File | Role |
 | --- | --- |
-| `model.py` | `Instance`, `Turbine`, `WindScenario`, `evaluate()`, `random_layout()` |
-| `generator.py` | `build_wind_rose()`, `generate()`, CLI `main()` |
-| `solver.py` | `HillClimbingSolver`, `Solution`, CLI `main()` |
-| `app.py` | Streamlit dashboard (layout + convergence) |
-
-All commands below must be run **from the repository root** (`MetaLab Suite/`),
-after a one-off environment sync:
-
-```bash
-uv sync              # core dependencies (includes the dev group)
-uv sync --group dev  # same, explicit: + pytest, ruff, ipykernel
-```
+| `simulator_wflo.py` | `WindFarmEnvironment`, `WindFarmInstance`, Jensen wake physics, `evaluate_power_output` |
+| `generate_instances_wflo.py` | CLI that writes `instances/toy.json` and `instances/hard.json` |
+| `example_random_search.py` | A minimal random-search baseline (replace it!) |
+| `starter/` | A separate, even simpler grid problem for a very first warm-up |
 
 ---
 
 ## 3. Commands
 
-### 3.1 Instance generator
+All commands are run **from the repository root**, after `uv sync`.
 
-Create a reproducible instance (JSON written to
-`wind_farm_layout_optimization/instances/`):
+### 3.1 Generate the instances
 
 ```bash
-# sensible defaults: 20 turbines, 2000 m farm, seed 0
-uv run python -m wind_farm_layout_optimization.generator --name demo --turbines 20 --seed 0
+# both the 'toy' and 'hard' instances -> wind_farm_layout_optimization/instances/
+uv run python -m wind_farm_layout_optimization.generate_instances_wflo --name all
 
-# a larger, customised farm
-uv run python -m wind_farm_layout_optimization.generator \
-    --name farm_50 \
-    --turbines 50 \
-    --side 5000 \
-    --min-spacing 5 \
-    --seed 42
+# or just one of them
+uv run python -m wind_farm_layout_optimization.generate_instances_wflo --name toy
+uv run python -m wind_farm_layout_optimization.generate_instances_wflo --name hard --seed 42
 ```
 
 | Flag | Default | Meaning |
 | --- | --- | --- |
-| `--name` | `demo` | Instance name / output file stem |
-| `--turbines` | `20` | Number of turbines `N` |
-| `--side` | `2500` | Farm side length in metres |
-| `--min-spacing` | `4` | Minimum spacing in rotor diameters |
-| `--seed` | `0` | Random seed |
-| `--out` | `instances/<name>.json` | Explicit output path |
+| `--name` | `all` | `toy`, `hard` or `all` |
+| `--seed` | `0` | seed stored in the instance |
+| `--out-dir` | `wind_farm_layout_optimization/instances` | output directory |
 
-### 3.2 Baseline solver
+* **toy** — rectangular farm (2400 × 2400 m), 1 exclusion zone, 10 turbines,
+  a simple 4-direction wind rose. Use it to develop and debug.
+* **hard** — irregular 8-vertex terrain (≈ 3.2 × 2.4 km), 3 exclusion zones,
+  24 turbines, a 12-direction wind rose. Use it to evaluate your final method.
 
-Run the reference **hill-climbing** trajectory method on an instance
-(solution JSON written to `wind_farm_layout_optimization/solutions/`):
+### 3.2 Inspect a random layout (simulator demo)
 
 ```bash
-uv run python -m wind_farm_layout_optimization.solver \
-    --instance wind_farm_layout_optimization/instances/demo.json \
-    --iterations 3000
+uv run python -m wind_farm_layout_optimization.simulator_wflo \
+    --instance wind_farm_layout_optimization/instances/toy.json --seed 0
+```
 
-# more effort, custom seed and output location
-uv run python -m wind_farm_layout_optimization.solver \
-    --instance wind_farm_layout_optimization/instances/demo.json \
-    --iterations 8000 \
-    --step 200 \
-    --seed 7 \
-    --out wind_farm_layout_optimization/solutions/demo_hc.json
+### 3.3 The random-search example (your starting point)
+
+```bash
+uv run python -m wind_farm_layout_optimization.example_random_search \
+    --instance wind_farm_layout_optimization/instances/toy.json --iterations 2000
+
+uv run python -m wind_farm_layout_optimization.example_random_search \
+    --instance wind_farm_layout_optimization/instances/hard.json --iterations 1000
 ```
 
 | Flag | Default | Meaning |
 | --- | --- | --- |
-| `--instance` | *(required)* | Path to an instance JSON |
-| `--iterations` | `3000` | Number of hill-climbing iterations |
-| `--step` | `150` | Initial Gaussian move size (m); cools to ~10 % |
-| `--seed` | instance seed | Override the random seed |
-| `--out` | `solutions/<instance>.json` | Explicit output path |
+| `--instance` | `instances/toy.json` | which instance to solve |
+| `--iterations` | `2000` | number of layouts sampled |
+| `--seed` | `0` | random seed |
+| `--out` | `solutions/<instance>_random.json` | where the best layout is saved |
 
-The solver prints the achieved **AEP (GWh/yr)**, the **capacity factor** and the
-solution path.
-
-### 3.3 Local GUI (Streamlit)
-
-```bash
-uv run streamlit run wind_farm_layout_optimization/app.py
-```
-
-Streamlit prints a local URL (default <http://localhost:8501>). In the browser:
-
-1. pick a generated instance in the sidebar (or use the built-in demo),
-2. set iterations / move size / seed,
-3. press **Run hill climbing**,
-4. inspect the turbine layout and the convergence curve.
+> There is **no baseline solver and no GUI** in this assignment by design: the
+> only algorithm you are given is this random-search example. Everything else is
+> yours to implement.
 
 ---
 
-## 4. Typical workflow
+## 4. Programming interface
 
-```bash
-uv sync
-uv run python -m wind_farm_layout_optimization.generator --name demo --turbines 20 --seed 0
-uv run python -m wind_farm_layout_optimization.solver \
-    --instance wind_farm_layout_optimization/instances/demo.json --iterations 5000
-uv run streamlit run wind_farm_layout_optimization/app.py
+Everything you need is in `simulator_wflo.py`:
+
+```python
+from wind_farm_layout_optimization.simulator_wflo import WindFarmEnvironment
+
+env = WindFarmEnvironment.from_file("wind_farm_layout_optimization/instances/toy.json")
+
+layout = env.random_layout(seed=0)          # a feasible starting layout
+report = env.evaluate(layout)               # expected performance over the rose
+print(report["expected_power_mw"])          # <- the number you must maximise
+print(report["feasible"])                   # terrain / exclusion / spacing check
 ```
+
+Key methods:
+
+| Call | Returns |
+| --- | --- |
+| `env.evaluate_power_output(layout, wind_scenario)` | `{"power_mw": …, "efficiency": …}` for one scenario |
+| `env.efficiency(layout, wind_scenario=None)` | actual efficiency (power ÷ installed capacity) |
+| `env.evaluate(layout)` | **`expected_power_mw`**, `expected_efficiency`, `aep_gwh`, feasibility |
+| `env.is_feasible(layout)` / `env.feasibility_report(layout)` | constraint diagnostics |
+| `env.random_layout(seed)` | a random feasible layout |
+
+A **layout** is simply a list of `N` turbine positions, `[[x, y], …]`. Your
+metaheuristic should return such a list (with `env.evaluate(layout)["feasible"]`
+true). Save results under `solutions/`, following the naming of the example.
 
 ---
 
-## 5. Extending the problem (for students)
+## 5. Deliverables
 
-* **New algorithms** — add `solvers/simulated_annealing.py`, expose a `solve()`
-  with the same signature as `HillClimbingSolver`, and reuse
-  `metalab.ConvergenceTrace` for the convergence curve.
-* **New physics** — replace the Jensen model in `model.evaluate()` with a
-  Gaussian wake model; nothing else needs to change.
-* **New objective** — add noise/cost and switch `ConvergenceTrace(maximize=...)`.
+1. A Python module implementing **one trajectory-based metaheuristic**
+   (simulated annealing, tabu search, iterated local search, …) that uses
+   `WindFarmEnvironment` **without modifying it**.
+2. Your best layouts for `toy` and `hard`, saved to `solutions/`.
+3. A short report: convergence curve, best expected power/efficiency, and how
+   you handled the terrain, exclusion and spacing constraints.
 
-> **Suite rule:** every problem folder ships with a README exactly like this
-> one, documenting context, structure and the `uv run` commands.
+> **Suite rule:** every problem folder ships with a README like this one,
+> documenting the context, the structure and the exact `uv run` commands.

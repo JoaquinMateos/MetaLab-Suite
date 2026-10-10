@@ -30,8 +30,8 @@ one lockfile, one virtual environment, many problems.
 
 | Folder | Problem | Objective | Baseline |
 | --- | --- | --- | --- |
-| [`wind_farm_layout_optimization/`](wind_farm_layout_optimization/README.md) | Wind Farm Layout Optimization (WFLO) | maximise AEP (GWh/yr) | stochastic hill climbing |
-| ↳ [`…/starter/`](wind_farm_layout_optimization/starter/README.md) | WFLO — **beginner edition** (grid + your first hill climber) | maximise expected power | random search |
+| [`wind_farm_layout_optimization/`](wind_farm_layout_optimization/README.md) | Wind Farm Layout Optimization (WFLO) — **assignment** | maximise expected power | random search (example only) |
+| ↳ [`…/starter/`](wind_farm_layout_optimization/starter/README.md) | WFLO warm-up — grid hill-climber skeleton | maximise expected power | random search |
 | [`dynamic_dial_a_ride/`](dynamic_dial_a_ride/README.md) | Dynamic Dial-a-Ride Problem (DDRP) | minimise travel + service cost | cheapest insertion |
 
 > More problems are added over time. Each new folder ships with its own
@@ -43,7 +43,7 @@ Each problem has its own standalone PDF in [`docs/`](docs/):
 
 | PDF | Level | Contents |
 | --- | --- | --- |
-| [`wind_farm_layout_optimization.pdf`](docs/wind_farm_layout_optimization.pdf) | beginner | the simplified grid model, why metaheuristics are needed, and a full hill-climbing walkthrough |
+| [`wind_farm_layout_optimization.pdf`](docs/wind_farm_layout_optimization.pdf) | assignment | WFLO theory: terrain & exclusions, simplified Jensen wake model, objective (no worked algorithm) |
 | [`dynamic_drone_routing.pdf`](docs/dynamic_drone_routing.pdf) | advanced | the Dynamic Drone Routing Problem (Dorling et al., 2016): objective, capacity/battery constraints, rolling-horizon and tabu search |
 
 To rebuild the PDFs (needs a LaTeX distribution):
@@ -88,11 +88,11 @@ cd MetaLab-Suite
 # 2. create the environment (one venv for the whole suite)
 uv sync
 
-# 3. try a problem — for example the wind farm
-uv run python -m wind_farm_layout_optimization.generator --name demo --turbines 20 --seed 0
-uv run python -m wind_farm_layout_optimization.solver \
-    --instance wind_farm_layout_optimization/instances/demo.json --iterations 3000
-uv run streamlit run wind_farm_layout_optimization/app.py
+# 3. try the wind-farm assignment
+uv run python -m wind_farm_layout_optimization.generate_instances_wflo --name all
+uv run python -m wind_farm_layout_optimization.example_random_search \
+    --instance wind_farm_layout_optimization/instances/toy.json --iterations 2000
+uv run streamlit run wind_farm_layout_optimization/starter/app.py
 ```
 
 Add `--group dev` to be explicit about the development tools (pytest, ruff,
@@ -111,20 +111,20 @@ MetaLab Suite/
 ├── README.md                      # you are here
 ├── LICENSE                        # MIT
 ├── docs/                          # one LaTeX source + PDF per problem
-│   ├── wind_farm_layout_optimization.tex/.pdf   # beginner edition
+│   ├── wind_farm_layout_optimization.tex/.pdf   # assignment (theory)
 │   └── dynamic_drone_routing.tex/.pdf           # advanced
 ├── src/
 │   └── metalab/                   # shared, problem-agnostic helpers
 │       ├── __init__.py
 │       └── trace.py               # ConvergenceTrace (convergence curves)
-├── wind_farm_layout_optimization/ # Problem #1 (self-contained)
-│   ├── model.py  generator.py  solver.py  app.py  README.md
-│   ├── starter/                   # beginner edition (grid + hill-climber skeleton)
-│   │   ├── model.py  generate.py  random_search.py
-│   │   ├── hill_climbing.py       # ✏️ student task
-│   │   └── app.py  README.md
+├── wind_farm_layout_optimization/ # Problem #1 — student assignment
+│   ├── simulator_wflo.py          # GIVEN: WindFarmEnvironment (Jensen wakes)
+│   ├── generate_instances_wflo.py # GIVEN: builds toy + hard instances
+│   ├── example_random_search.py   # GIVEN: the only algorithm (an example)
+│   ├── README.md                  # technical execution guide
+│   ├── starter/                   # optional warm-up (grid + hill-climber skeleton)
 │   ├── instances/                 # generated data (git-ignored)
-│   └── solutions/                 # solver output (git-ignored)
+│   └── solutions/                 # your solver output (git-ignored)
 └── dynamic_dial_a_ride/           # Problem #2 (self-contained)
     ├── model.py  generator.py  solver.py  app.py  README.md
     ├── instances/
@@ -133,8 +133,9 @@ MetaLab Suite/
 
 ### Anatomy of a problem folder
 
-Every problem follows the same convention, so students can move between them
-without re-learning the layout:
+Problems come in two flavours, but always follow a “given vs. yours” split.
+
+**Reference problems** (e.g. `dynamic_dial_a_ride/`) provide a full pipeline:
 
 | File | Purpose |
 | --- | --- |
@@ -143,6 +144,17 @@ without re-learning the layout:
 | `solver.py` | Baseline solver + CLI, writes results to `solutions/` |
 | `app.py` | Streamlit GUI: pick instance → run → visualise |
 | `README.md` | Context, structure and the exact `uv run` commands |
+
+**Assignments** (e.g. `wind_farm_layout_optimization/`) give the student a
+*simulator* and a *generator* only, plus a trivial example — the metaheuristic
+is the deliverable:
+
+| File | Purpose |
+| --- | --- |
+| `simulator_wflo.py` | Given: the objective/physics (the "ground truth") |
+| `generate_instances_wflo.py` | Given: builds the `toy` and `hard` instances |
+| `example_random_search.py` | Given: a deliberately weak example algorithm |
+| `README.md` | Technical execution guide (referenced by the PDF) |
 
 ---
 

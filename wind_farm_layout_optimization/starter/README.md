@@ -4,9 +4,9 @@
 > A tiny, grid-based wind-farm exercise: complete a hill climber and beat random
 > search.
 
-This folder is the **simplified** version of the Wind Farm Layout Optimization
-problem, designed to be the very first metaheuristic you ever implement. The
-full, continuous version lives one level up in [`../README.md`](../README.md).
+This folder is a small warm-up exercise. The main WFLO assignment — with a
+terrain polygon, exclusion zones and the Jensen wake simulator — lives one level
+up in [`../README.md`](../README.md).
 
 ---
 

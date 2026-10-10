@@ -1,7 +1,8 @@
 %==============================================================================
-%  MetaLab Suite --- Problem #1 (beginner edition)
-%  Wind Farm Layout Optimization: a first metaheuristics exercise
+%  MetaLab Suite --- Problem #1
+%  Wind Farm Layout Optimization: assignment (theoretical base)
 %
+%  Companion technical guide: wind_farm_layout_optimization/README.md
 %  Compile with:  pdflatex wind_farm_layout_optimization.tex   (twice for the ToC)
 %==============================================================================
 \documentclass[11pt,a4paper]{article}
@@ -10,23 +11,38 @@
 \usepackage[utf8]{inputenc}
 \usepackage{lmodern}
 \usepackage[margin=2.5cm]{geometry}
-\usepackage{amsmath,amssymb,mathtools}
+\usepackage{amsmath,amssymb,amsthm,mathtools}
 \usepackage{booktabs}
-\usepackage{algorithm}
-\usepackage{algpseudocode}
+\usepackage{array}
 \usepackage{xcolor}
+\usepackage{listings}
 \usepackage{microtype}
 \usepackage[hidelinks]{hyperref}
 
 \newcommand{\R}{\mathbb{R}}
+\newcommand{\norm}[1]{\left\lVert #1 \right\rVert}
 \DeclareMathOperator*{\argmax}{arg\,max}
+
+\lstdefinestyle{py}{
+  language=Python,
+  basicstyle=\ttfamily\small,
+  keywordstyle=\color{blue!70!black},
+  commentstyle=\color{gray},
+  stringstyle=\color{green!45!black},
+  numbers=left,
+  numberstyle=\tiny\color{gray},
+  frame=single,
+  breaklines=true,
+  showstringspaces=false,
+  columns=fullflexible,
+}
 
 \title{%
   \textbf{Wind Farm Layout Optimization}\\[2mm]
-  \large A First Metaheuristics Exercise}
+  \large Assignment --- Theoretical Base}
 \author{%
   MetaLab Suite\\[1mm]
-  \small Problem \#1 --- beginner edition}
+  \small Problem \#1}
 \date{\today}
 
 %==============================================================================
@@ -35,270 +51,238 @@
 
 \begin{abstract}
 \noindent
-This is the friendly, first-days-of-the-course version of the Wind Farm Layout
-Optimization (WFLO) problem. We strip the problem down to a small grid, two
-wind directions, a single wake rule and one objective, so that the only thing
-left to do is the thing we actually want to teach: \emph{how to design a
-metaheuristic}. By the end you will have implemented your first hill climber and
-compared it against random search and the exact optimum. The full, continuous
-version of the problem is described in the advanced companion document.
+This document defines the Wind Farm Layout Optimization (WFLO) problem that you
+must solve. It gives the decision variables, the topographical and spacing
+constraints, the simplified \emph{Jensen} wake model, the turbine power curve,
+and the objective function---the expected farm power. It is the \emph{theory};
+the technical instructions for generating instances and evaluating layouts are
+in the companion guide \texttt{wind\_farm\_layout\_optimization/README.md}.
+The simulator and the instance generator are provided; the
+\emph{metaheuristic is your task}. A single random-search example is included
+only to show the interface.
 \end{abstract}
 
 \tableofcontents
 
 %==============================================================================
-\section{The problem in words}
+\section{Assignment brief}
 %==============================================================================
 
-A wind farm is a small \textbf{grid of cells}. We own $N$ turbines and must
-decide \textbf{which $N$ cells} to occupy. The catch is the \emph{wake effect}:
-a turbine slows the air behind it, so any turbine standing downwind of it
-receives less wind, and therefore produces less power. Placing turbines far
-apart reduces this interference, but we cannot make the farm infinitely large.
+You are given a piece of land (a \emph{terrain polygon}), a set of forbidden
+areas (\emph{exclusion zones}), a number of turbines $N$, and a \emph{wind
+rose} describing how often the wind blows from each direction and how fast. You
+must decide \textbf{where to place the $N$ turbines} so as to maximise the
+farm's \textbf{expected electrical power}.
 
-To make the problem concrete and small enough to reason about, we use a
-``toy'' model with exactly two wind directions:
+The obstacle is the \emph{wake effect}: a turbine extracts energy from the flow
+and leaves a slower wake behind it, so a turbine standing downwind of another
+produces less. Spreading turbines out reduces interference but is limited by the
+available terrain and by a minimum-spacing rule.
 
-\begin{itemize}
-  \item the wind blows \textbf{east} (left $\rightarrow$ right) with
-        probability $p_{\text{east}}$;
-  \item the wind blows \textbf{south} (top $\rightarrow$ bottom) with
-        probability $p_{\text{south}} = 1 - p_{\text{east}}$.
-\end{itemize}
-
-The two directions are what make the problem interesting. With only the east
-wind, the best plan would be to line every turbine up in the \emph{leftmost
-column} (nothing is upwind of anything). But the south wind would then knock
-those very turbines down: standing in a single column, they shelter one another
-vertically. The optimal layout must \textbf{stagger} the turbines so that the
-wake losses are shared fairly between the two directions.
+You must implement \textbf{one trajectory-based metaheuristic} (simulated
+annealing, tabu search, iterated local search, \dots) that calls the provided
+simulator. You are expected to design the encoding, the neighbourhood and the
+acceptance rule yourselves. \textcolor{gray}{\emph{No worked algorithm is
+supplied beyond the random-search example of Section~\ref{sec:example}.}}
 
 %==============================================================================
-\section{A simple model}
+\section{The model}
 %==============================================================================
 
-\subsection{Domain and decision variables}
+\subsection{Decision variables}
 
-The farm is an $m\times m$ grid of cells. Number the cells
-$0,1,\dots,m^{2}-1$; cell $c$ sits at row and column
+A layout is a set of $N$ turbine positions in the plane,
 \begin{equation}
-  (r, y) = (c \div m,\ c \bmod m).
+  X = \{\, x_{1}, x_{2}, \dots, x_{N} \,\},
+  \qquad x_{j} = \bigl(x_{j}^{(1)}, x_{j}^{(2)}\bigr) \in \R^{2},
 \end{equation}
-A \textbf{layout} is a set
+to be chosen within the terrain. In code, a layout is simply a list of $N$
+pairs ``\texttt{[[x, y], ...]}''. The search space is continuous; the
+constraints below make its feasible set non-convex.
+
+\subsection{Topographical and engineering constraints}
+
+Let $\Omega \subset \R^{2}$ be the terrain polygon. The feasible set is the
+intersection of the following:
+
+\begin{description}
+  \item[(C1) Inside the terrain.] Every turbine lies in $\Omega$ (in code, a
+  point-in-polygon test):
+  \begin{equation}
+    x_{j} \in \Omega, \qquad j = 1,\dots,N.
+  \end{equation}
+
+  \item[(C2) Outside the exclusion zones.] Forbidden polygons
+  $\{Z_{m}\}_{m=1}^{M}$ (buildings, protected areas, \dots) must be avoided:
+  \begin{equation}
+    x_{j} \notin \bigcup_{m=1}^{M} Z_{m}, \qquad j = 1,\dots,N.
+  \end{equation}
+
+  \item[(C3) Minimum spacing.] Turbines keep a centre-to-centre distance of at
+  least $\gamma$ rotor diameters $D$,
+  \begin{equation}
+    \norm{x_{i}-x_{j}} \ \ge \ s_{\min} = \gamma\,D,
+    \qquad 1 \le i < j \le N,
+  \end{equation}
+  with $\gamma$ given in the instance (typically $3$--$4$).
+  Constraint (C3) is what removes the ``stack them all upwind'' trivial
+  solution and makes $\Omega$ effectively non-convex.
+\end{description}
+
+\subsection{The wind rose}
+
+The climate is summarised by a finite set of $S$ scenarios
+$\{(\theta_{s}, U_{s}, p_{s})\}_{s=1}^{S}$, where $\theta_{s}$ is the bearing
+the wind blows \emph{towards}, $U_{s}$ its free-stream speed, and
+$p_{s}\in[0,1]$ its relative frequency ($\sum_{s} p_{s} = 1$). The wind travel
+unit vector is $n_{s} = (\cos\theta_{s}, \sin\theta_{s})$.
+
+\subsection{Simplified Jensen wake model}
+
+For two turbines $i$ and $j$ define the along-wind and cross-wind separations
 \begin{equation}
-  X = \{c_{1}, c_{2}, \dots, c_{N}\} \subset \{0, 1, \dots, m^{2}-1\},
-  \qquad \lvert X \rvert = N,
+  x_{ij} = (x_{j}-x_{i})\cdot n_{s},
+  \qquad
+  y_{ij} = \bigl\lvert (x_{j}-x_{i})\cdot n_{s}^{\perp} \bigr\rvert .
 \end{equation}
-i.e.\ a choice of $N$ distinct cells. This set of cells is the only decision we
-make.
-
-\subsection{The wake rule}
-
-Wind direction determines the direction of the wakes, and therefore which
-turbines are ``upwind'' of which. We use one fixed loss factor
-$\lambda_{\text{wake}} = \texttt{wake\_loss} \in [0,1]$ and the simple rule:
-
-\begin{quote}
-A turbine loses a fraction $\lambda_{\text{wake}}$ of its wind speed
-\emph{for every turbine that is upwind of it on its own line}.
-\end{quote}
-
-``Upwind on its own line'' means, concretely,
-\begin{itemize}
-  \item \textbf{east wind:} other turbines in the \emph{same row} with a
-        \emph{smaller column};
-  \item \textbf{south wind:} other turbines in the \emph{same column} with a
-        \emph{smaller row}.
-\end{itemize}
-
-Let $k_{i}^{d}$ be the number of turbines upwind of turbine $i$ for direction
-$d \in \{\text{east},\ \text{south}\}$. The speed turbine $i$ sees is
+The Jensen model \cite{jensen1983} assumes a linear, top-hat wake whose radius
+grows with downstream distance,
 \begin{equation}
-  u_{i}^{d} = u_{\infty}\,\bigl(1-\lambda_{\text{wake}}\bigr)^{\,k_{i}^{d}},
+  R_{w}(x) = \frac{D}{2} + k\,x ,
+  \label{eq:wake-radius}
+\end{equation}
+where $k$ is the wake-decay constant. Turbine $j$ suffers a fractional velocity
+deficit from turbine $i$ when it lies in that wake ($x_{ij}>0$ and
+$y_{ij}\le R_{w}(x_{ij})$):
+\begin{equation}
+  \delta_{ij}
+  = \bigl(1-\sqrt{1-C_{T}}\bigr)
+    \left(\frac{D}{D + 2k\,x_{ij}}\right)^{2},
+  \qquad
+  \delta_{ij}=0 \ \text{otherwise},
+  \label{eq:deficit}
+\end{equation}
+with $C_{T}$ the thrust coefficient. The factor $1-\sqrt{1-C_{T}}$ is twice the
+axial induction factor. Superposing the contributions of all upwind turbines in
+root-sum-square form, the speed seen by turbine $j$ under scenario $s$ is
+\begin{equation}
+  u_{j}^{(s)} = U_{s}\left( 1-\sqrt{\sum_{i \in \mathcal{I}_{j}} \delta_{ij}^{2}} \right)_{+},
+  \qquad
+  \mathcal{I}_{j} = \{\, i : x_{ij}>0,\ y_{ij}\le R_{w}(x_{ij}) \,\},
   \label{eq:speed}
 \end{equation}
-where $u_{\infty} = \texttt{free\_speed}$ is the free-stream wind speed. Being
-second on a line costs one factor $(1-\lambda_{\text{wake}})$, being third costs
-two, and so on.
+where $(\cdot)_{+}=\max(\cdot,0)$.
 
-\subsection{Turbine power}
+\subsection{Turbine power and objective}
 
-Each turbine converts wind speed into electrical power through the cubic power
-curve
+A turbine converts wind speed into power through the cubic power curve (with
+cut-in $u_{\text{in}}$, rated speed $u_{r}$, cut-out $u_{\text{out}}$ and rated
+power $P_{r}$):
 \begin{equation}
-  P(u) = P_{r}\left(\min\!\Bigl(1,\ \tfrac{u}{u_{r}}\Bigr)\right)^{3},
+  P(u) =
+  \begin{cases}
+    0, & u < u_{\text{in}} \ \text{or} \ u \ge u_{\text{out}},\\[1mm]
+    P_{r}\Bigl(\dfrac{u-u_{\text{in}}}{u_{r}-u_{\text{in}}}\Bigr)^{3},
+      & u_{\text{in}} \le u < u_{r},\\[2mm]
+    P_{r}, & u_{r} \le u < u_{\text{out}}.
+  \end{cases}
   \label{eq:power}
 \end{equation}
-where $u_{r} = \texttt{rated\_speed}$ and $P_{r} = \texttt{rated\_power}$ are
-the rated speed and rated power. Below the rated speed the power grows with the
-cube of the wind ($P \propto u^{3}$); above it the turbine is capped.
-
-\subsection{Objective: expected total power}
-
-For one direction, the farm produces the sum of its turbines' power,
-\begin{equation}
-  P^{d}(X) = \sum_{i=1}^{N} P\!\left(u_{i}^{d}(X)\right),
-\end{equation}
-and the quantity we want to \textbf{maximise} is the expected power over the two
-directions:
+The farm power under scenario $s$ is the sum over turbines,
+$P_{\text{total}}^{(s)}(X) = \sum_{j=1}^{N} P\bigl(u_{j}^{(s)}\bigr)$, and the
+\textbf{objective} (to be maximised) is the expected power over the rose:
 \begin{equation}
   \boxed{\;
-  P_{\text{total}}(X)
-  = p_{\text{east}}\, P^{\text{east}}(X)
-  + p_{\text{south}}\, P^{\text{south}}(X)
-  = \sum_{d} p_{d} \sum_{i=1}^{N} P\!\left(u_{i}^{d}(X)\right). \;}
+  \bar{P}(X)
+  = \sum_{s=1}^{S} p_{s}\, P_{\text{total}}^{(s)}(X)
+  = \sum_{s=1}^{S} p_{s} \sum_{j=1}^{N}
+      P\!\left( u_{j}^{(s)}(X) \right). \;}
   \label{eq:objective}
 \end{equation}
-The complete problem is
+The simulator reports $\bar{P}$ together with the \emph{actual efficiency},
+defined as the ratio of the expected power to the installed capacity,
 \begin{equation}
-  \max_{X} \ P_{\text{total}}(X)
-  \quad\text{subject to}\quad
-  X \subset \{0,\dots,m^{2}-1\},\ \lvert X\rvert = N .
-  \label{eq:problem}
+  \eta(X) = \frac{\bar{P}(X)}{N\,P_{r}} \in [0,1],
 \end{equation}
+and the annual energy production $\text{AEP}(X) = 8760\,\bar{P}(X)$ (in the
+instance's power units).
 
-\begin{quote}
-\textbf{Constraint (only one).} The $N$ turbines occupy \emph{distinct} cells.
-Everything else is objective.
-\end{quote}
+\subsection{Why the problem is hard}
+
+The objective \eqref{eq:objective} is non-separable (a turbine's output depends
+on all turbines upwind of it), non-smooth (the wake indicator
+$y_{ij}\le R_{w}(x_{ij})$ and the kinks of \eqref{eq:power} are
+non-differentiable), and multimodal (each of the $\binom{N}{2}$ pairwise wake
+interactions contributes local optima). Together with the non-convex feasible
+set of Section~2.2, this defeats gradient-based solvers and calls for
+\emph{trajectory-based metaheuristics}.
 
 %==============================================================================
-\section{Why we need a metaheuristic}
+\section{What you are given}
+\label{sec:given}
 %==============================================================================
 
-\subsection{The search space is exponential}
+Two components are provided and must not be modified:
 
-The number of possible layouts is the number of ways to choose $N$ cells out of
-$m^{2}$:
-\begin{equation}
-  \lvert \mathcal{X} \rvert = \binom{m^{2}}{N}.
-  \label{eq:space}
-\end{equation}
-For the default instance ($m=4$, $N=6$) this is only
-$\binom{16}{6} = 8008$ --- small enough that we \emph{can} check every layout by
-brute force, which is wonderful for grading. But the space explodes: going to
-$m=8$, $N=16$ gives $\binom{64}{16} \approx 4.9\times10^{14}$ layouts, far
-beyond enumeration.
-
-\subsection{The objective is a nasty, non-smooth landscape}
-
-Even though the problem looks tame, the objective \eqref{eq:objective} has two
-features that defeat simple, greedy reasoning:
 \begin{itemize}
-  \item \textbf{coupling.} Whether a turbine suffers a wake depends on
-        \emph{which other} turbines were placed in its row and column, so the
-        contribution of a turbine cannot be optimised in isolation.
-  \item \textbf{multimodality.} Because the two directions pull in different
-        ways, good layouts come in competing ``families'' (staggered patterns
-        aligned one way or the other), separated by mediocre layouts. There are
-        many local optima.
+  \item the \textbf{simulator} (\texttt{simulator\_wflo.py}) --- the
+  \texttt{WindFarmEnvironment} class implements Section~2, exposing
+  \texttt{evaluate\_power\_output(layout, wind\_scenario)} and the aggregate
+  \texttt{evaluate(layout)};
+  \item the \textbf{instance generator}
+  (\texttt{generate\_instances\_wflo.py}) --- builds the \texttt{toy} and
+  \texttt{hard} instances (terrain, exclusion zones, $N$, wind rose).
 \end{itemize}
-Trying to improve a layout one greedy step at a time gets trapped in whichever
-local optimum it happens to fall into. This is exactly the situation
-\emph{metaheuristics} are built for.
+
+\begin{center}
+\fbox{\parbox{0.92\linewidth}{\centering
+\textbf{All commands to generate instances and evaluate layouts are in the
+technical guide:} \texttt{wind\_farm\_layout\_optimization/README.md}.}}
+\end{center}
+
+A layout is ``feasible'' when it satisfies (C1)--(C3); the simulator reports
+this for you, together with the objective and the efficiency.
 
 %==============================================================================
-\section{Your first metaheuristic: hill climbing}
+\section{An example: random search}
+\label{sec:example}
 %==============================================================================
 
-A \emph{trajectory-based} metaheuristic walks a single solution through the
-search space. Hill climbing is the simplest one:
+The only algorithm supplied is the weakest possible one. Use it to learn the
+interface, then \textbf{replace it}. It samples random feasible layouts and
+keeps the best.
+
+\begin{lstlisting}[style=py,caption={The provided random-search example.}]
+def random_search(env, iterations, seed):
+    rng = np.random.default_rng(seed)
+    best_layout, best_value = None, float("-inf")
+    for _ in range(iterations):
+        layout = env.random_layout(seed=int(rng.integers(1, 2**31)))
+        value = env.evaluate(layout)["expected_power_mw"]
+        if value > best_value:
+            best_layout, best_value = layout, value
+    return best_layout, best_value
+\end{lstlisting}
+
+\noindent
+Everything you write should follow the same pattern: produce a candidate
+\texttt{layout} and score it with
+\texttt{env.evaluate(layout)["expected\_power\_mw"]}. The design of the move
+(neighbourhood) and of the acceptance rule is entirely up to you.
+
+%==============================================================================
+\section{Deliverables}
+%==============================================================================
 
 \begin{enumerate}
-  \item start from a random layout;
-  \item make a small random change to get a \textbf{neighbouring} layout;
-  \item if the neighbour is better, keep it; otherwise throw it away;
-  \item repeat many times, remembering the best layout ever seen.
+  \item A Python module implementing \textbf{one trajectory-based
+  metaheuristic} that uses \texttt{WindFarmEnvironment} without modifying it.
+  \item Your best layouts for the \texttt{toy} and \texttt{hard} instances,
+  saved under \texttt{solutions/}.
+  \item A short report containing: the convergence curve, the best expected
+  power and efficiency, and an explanation of how your method handles the
+  terrain, exclusion and spacing constraints.
 \end{enumerate}
-
-Two ingredients define any such method: the \textbf{neighbourhood} (what a
-``small change'' is) and the \textbf{acceptance rule} (when to keep the change).
-For hill climbing the acceptance rule is simply: \emph{keep it if it is
-better}. The neighbourhood is the part we leave to you.
-
-\subsection{A neighbourhood for this problem}
-
-A natural move is to take \textbf{one turbine} and move it to a
-\textbf{currently empty} cell:
-\begin{equation}
-  \text{neighbour}(X):\quad
-  \text{pick } i \text{ at random},\quad
-  \text{set } c_{i} \leftarrow c \text{ with } c \notin X .
-  \label{eq:move}
-\end{equation}
-This always produces a valid layout (still $N$ distinct cells), which is one of
-the reasons this encoding is so pleasant.
-
-\begin{algorithm}[H]
-\caption{Hill climbing (maximisation)}
-\label{alg:hc}
-\begin{algorithmic}[1]
-\State $X \leftarrow$ \Call{RandomLayout}{$m, N$}
-\State $X^{\star} \leftarrow X$ \Comment{best layout so far}
-\For{$t = 1$ \textbf{to} $T$}
-  \State $X' \leftarrow$ \Call{Neighbour}{$X$} \Comment{the move you implement}
-  \If{$P_{\text{total}}(X') > P_{\text{total}}(X)$}
-      \State $X \leftarrow X'$
-      \If{$P_{\text{total}}(X) > P_{\text{total}}(X^{\star})$}
-          \State $X^{\star} \leftarrow X$
-      \EndIf
-  \EndIf
-\EndFor
-\State \Return $X^{\star}$
-\end{algorithmic}
-\end{algorithm}
-
-%==============================================================================
-\section{Your task}
-%==============================================================================
-
-Everything is provided except the neighbourhood. Open
-\texttt{hill\_climbing.py} and implement \texttt{random\_neighbour()}: move one
-random turbine to a random empty cell and return the new layout. Then:
-
-\begin{enumerate}
-  \item run hill climbing and compare its best power with random search;
-  \item compare both with the exhaustive optimum (\texttt{model.brute\_force});
-  \item read the suggestions below and try one of them.
-\end{enumerate}
-
-\begin{table}[H]
-\centering
-\caption{Where each piece lives (folder \texttt{starter/}).}
-\label{tab:files}
-\begin{tabular}{@{}ll@{}}
-\toprule
-File & Role \\
-\midrule
-\texttt{model.py}          & given: instance, wake rule, objective, brute force \\
-\texttt{generate.py}       & given: build instances (e.g.\ $m=4$, $N=6$) \\
-\texttt{random\_search.py} & given: baseline you must beat \\
-\texttt{hill\_climbing.py} & \textbf{your task}: implement the neighbourhood \\
-\texttt{app.py}            & given: interactive grid visualisation \\
-\bottomrule
-\end{tabular}
-\end{table}
-
-\paragraph{Stretch goal --- simulated annealing.}
-Hill climbing only ever accepts improvements, so it stops as soon as no
-neighbour is better. \textbf{Simulated annealing} instead accepts a worsening
-move with probability $\exp(-\Delta / T)$, where $\Delta>0$ is how much worse
-the neighbour is and $T$ is a \emph{temperature} that slowly decreases. Early on
-it wanders freely (high $T$); later it behaves like hill climbing (low $T$).
-Changing the acceptance rule in Algorithm~\ref{alg:hc} to this rule is a
-one-line experiment with a very visible effect on the convergence curve.
-
-%==============================================================================
-\section{Further reading}
-%==============================================================================
-
-The advanced companion document derives the continuous, physically detailed
-version of this problem, including the Jensen wake model, the full power curve,
-topographical constraints, and the mathematical justification for using
-trajectory metaheuristics. The classical references are \cite{jensen1983} for
-the wake model and \cite{mosetti1994,grady2005} for early metaheuristic
-approaches to turbine placement. Simulated annealing is due to
-\cite{kirkpatrick1983}.
 
 %==============================================================================
 \begin{thebibliography}{9}
@@ -308,17 +292,18 @@ N.~O.~Jensen,
 ``A note on wind generator interaction,''
 Ris\o{} National Laboratory, Roskilde, Denmark, Tech.\ Rep.\ Ris\o-M-2411, 1983.
 
+\bibitem{katic1986}
+I.~Kati\'c, J.~H\o{}jstrup, and N.~O.~Jensen,
+``A simple model for cluster efficiency,''
+in \emph{Proc.\ European Wind Energy Association Conference and Exhibition},
+Rome, Italy, 1986, pp.~407--410.
+
 \bibitem{mosetti1994}
 G.~Mosetti, C.~Poloni, and B.~Diviacco,
 ``Optimization of wind turbine positioning in large wind farms by means of a
 genetic algorithm,''
 \emph{Journal of Wind Engineering and Industrial Aerodynamics},
 vol.~51, no.~1, pp.~105--116, 1994.
-
-\bibitem{grady2005}
-S.~A.~Grady, M.~Y.~Hussaini, and M.~M.~Abdullah,
-``Placement of wind turbines using genetic algorithms,''
-\emph{Renewable Energy}, vol.~30, no.~2, pp.~259--270, 2005.
 
 \bibitem{kirkpatrick1983}
 S.~Kirkpatrick, C.~D.~Gelatt, and M.~P.~Vecchi,
