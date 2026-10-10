@@ -5,7 +5,7 @@ can iterate quickly without Streamlit or the autograder.
 
 From the repository root::
 
-    # the provided hill-climbing baseline (default), on the toy terrain
+    # the provided random-search baseline (default), on the toy terrain
     uv run python multimodal_continuous_optimization/run_local.py
 
     # a specific terrain, the student skeleton, and a custom file
@@ -38,8 +38,7 @@ from multimodal_continuous_optimization.given.simulator_mmco import (  # noqa: E
     Instance,
     SignalEnvironment,
 )
-from multimodal_continuous_optimization.hill_climbing_mmco import HillClimbingSolver  # noqa: E402
-from multimodal_continuous_optimization.pso_mmco import PSOSolver  # noqa: E402
+from multimodal_continuous_optimization.random_search_mmco import RandomSearchSolver  # noqa: E402
 from multimodal_continuous_optimization.student_mmco import (  # noqa: E402
     BaseSolver,
     BudgetExhausted,
@@ -51,8 +50,7 @@ DEFAULT_INSTANCES_DIR = HERE / "instances"
 DEFAULT_SOLUTIONS_DIR = HERE / "solutions"
 
 KNOWN_SOLVERS: dict[str, type[BaseSolver]] = {
-    "hill_climbing": HillClimbingSolver,
-    "pso": PSOSolver,
+    "random_search": RandomSearchSolver,
     "student": MySolver,
     "my_solver": MySolver,
 }
@@ -102,8 +100,8 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
         help="instance JSON produced by generate_instances_mmco.py",
     )
     parser.add_argument(
-        "--solver", default="hill_climbing",
-        help="'hill_climbing', 'student' or a path to a .py file defining a BaseSolver",
+        "--solver", default="random_search",
+        help="'random_search', 'student' or a path to a .py file defining a BaseSolver",
     )
     parser.add_argument("--seed", type=int, default=0, help="random seed")
     parser.add_argument(

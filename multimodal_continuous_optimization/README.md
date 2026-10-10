@@ -5,7 +5,7 @@
 > multimodal terrain full of false positives.
 
 This folder is a **self-contained assignment**. The **environment engine**, the
-**instance generator**, a **black-box student API**, one **baseline** and a
+**instance generator**, a **black-box student API**, a **random search** and a
 **terminal test harness** are provided; the **population-based metaheuristic is
 your task**.
 
@@ -34,8 +34,7 @@ multimodal_continuous_optimization/
 ├── README.md                          # this guide
 ├── __init__.py
 ├── student_mmco.py                    # YOUR file: BaseSolver (black box) + MySolver skeleton
-├── hill_climbing_mmco.py              # baseline example (gets stuck in a local optimum)
-├── pso_mmco.py                        # starter kit: PSO (+ an ABC adaptation guide)
+├── random_search_mmco.py              # the ONLY algorithm given (a random search)
 ├── run_local.py                       # terminal test harness
 ├── instances/                         # toy.json, hard.json (git-ignored)
 ├── solutions/                         # your outputs (git-ignored)
@@ -108,47 +107,21 @@ evaluations carefully. Implement `solve` to return the best point found.
 
 ---
 
-## 5. Provided algorithms
+## 5. The only algorithm: random search
 
-Two worked examples ship with the assignment.
-
-### 5.1 The baseline: hill climbing (and why it fails)
-
-`hill_climbing_mmco.py` provides `HillClimbingSolver`, a textbook trajectory
-method. It perturbs a single point and keeps the move only if it improves, so it
-**climbs the nearest basin and gets stuck in a local optimum** (a false
-positive), wasting the rest of the budget.
+`random_search_mmco.py` provides `RandomSearchSolver(BaseSolver)` --- the **only**
+algorithm you are given. It samples uniformly random points and keeps the best
+one until the budget is spent: no memory, no neighbourhood, no learning.
 
 ```bash
-uv run python multimodal_continuous_optimization/run_local.py \
-    --instance multimodal_continuous_optimization/instances/toy.json
-```
-
-Typical output on `toy`: a **gap** of ≈ 1.0 to the true signal, `hit=False`.
-
-### 5.2 The starter kit: Particle Swarm Optimization
-
-`pso_mmco.py` provides `PSOSolver(BaseSolver)` --- a clear, **deliberately
-un-tuned** PSO skeleton that applies the textbook theory:
-
-* one vector per particle for **position**, **velocity** and **personal best**,
-  plus the swarm's **global best**;
-* the velocity update balancing **inertia + cognitive + social** information
-  (`w`, `c1`, `c2`);
-* **bounds handling** that keeps every particle inside the search space.
-
-It is heavily commented so you can tune it --- or reshape it into an **Artificial
-Bee Colony (ABC)**; the employed / onlooker / scout recipe is written at the
-bottom of the file.
-
-```bash
-uv run python multimodal_continuous_optimization/run_local.py --solver pso
-uv run python multimodal_continuous_optimization/run_local.py --solver pso \
+uv run python multimodal_continuous_optimization/run_local.py --solver random_search
+uv run python multimodal_continuous_optimization/run_local.py --solver random_search \
     --instance multimodal_continuous_optimization/instances/hard.json
 ```
 
-On the `toy` terrain PSO reaches the signal (**gap ≈ 0**, `hit=True`), while hill
-climbing stalls at gap ≈ 1.0 --- a first taste of why population methods win.
+On the multimodal terrains it barely scratches the surface (a **gap** well above
+zero, `hit=False`), which is exactly the point: the population-based metaheuristic
+that closes that gap is **yours to write** in `student_mmco.py`.
 
 ---
 
@@ -159,7 +132,7 @@ callback and prints a report (evaluations used, best value, gap, validity) and
 saves the run JSON under `solutions/`.
 
 ```bash
-# the provided baseline (default), on the toy terrain
+# the provided random search (default), on the toy terrain
 uv run python multimodal_continuous_optimization/run_local.py
 
 # a specific terrain and seed
@@ -174,7 +147,7 @@ uv run python multimodal_continuous_optimization/run_local.py --solver my_solver
 | Flag | Default | Meaning |
 | --- | --- | --- |
 | `--instance` | `instances/toy.json` | terrain to solve |
-| `--solver` | `hill_climbing` | `hill_climbing`, `student`, or a path to a `.py` file |
+| `--solver` | `random_search` | `random_search`, `student`, or a path to a `.py` file |
 | `--seed` | `0` | random seed |
 | `--penalise` | off | penalise over-budget calls instead of cutting the run |
 | `--out` | `solutions/<instance>_<solver>.json` | where to save the run JSON |
@@ -241,7 +214,7 @@ budget; `validate()` guarantees the terrain is well-posed.
 ```bash
 uv run python -m multimodal_continuous_optimization.autograder.ingestion \
     multimodal_continuous_optimization /tmp/mmco_out \
-    multimodal_continuous_optimization/hill_climbing_mmco.py --time-limit 60
+    multimodal_continuous_optimization/random_search_mmco.py --time-limit 60
 
 uv run python -m multimodal_continuous_optimization.autograder.score \
     /tmp/mmco_out /tmp/mmco_scores

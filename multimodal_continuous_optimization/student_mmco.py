@@ -14,9 +14,8 @@ The callback *is* the environment. Every call consumes one evaluation from the
 budget; when the budget is spent the environment refuses further calls (and the
 run is invalid), so plan your budget carefully.
 
-Implement your method in :class:`MySolver` below. A worked baseline that
-*demonstrates the classic failure mode* (a trajectory method that gets stuck in
-a local optimum) is provided in ``hill_climbing_mmco.py``; test your code with
+Implement your method in :class:`MySolver` below. The only algorithm you are
+given is the random search in ``random_search_mmco.py``; test your code with
 ``run_local.py``.
 """
 

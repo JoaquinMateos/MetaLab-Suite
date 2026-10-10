@@ -39,8 +39,9 @@ from multimodal_continuous_optimization.given.simulator_mmco import (
     EvaluationBudgetExceeded,
     SignalEnvironment,
 )
-from multimodal_continuous_optimization.hill_climbing_mmco import HillClimbingSolver
-from multimodal_continuous_optimization.pso_mmco import PSOSolver
+from multimodal_continuous_optimization.random_search_mmco import (
+    RandomSearchSolver as MMCORandomSearchSolver,
+)
 from multimodal_continuous_optimization.student_mmco import (
     BaseSolver,
     BudgetExhausted,
@@ -263,9 +264,9 @@ def test_mmco_budget_penalty_mode() -> None:
     assert not env.report()["valid"]
 
 
-def _hill_climb(instance):
+def _run_solver(instance, solver_cls=MMCORandomSearchSolver):
     env = SignalEnvironment(instance)
-    solver = HillClimbingSolver(
+    solver = solver_cls(
         env.evaluate, instance.dimension, instance.lower, instance.upper,
         instance.max_evaluations, seed=0,
     )
@@ -273,9 +274,9 @@ def _hill_climb(instance):
     return env, solver, best
 
 
-def test_mmco_hill_climbing_respects_budget_and_bounds() -> None:
+def test_mmco_random_search_respects_budget_and_bounds() -> None:
     instance = build_mmco("toy", seed=0)
-    env, solver, best = _hill_climb(instance)
+    env, solver, best = _run_solver(instance)
     assert solver.queries == instance.max_evaluations
     assert len(best) == instance.dimension
     assert all(instance.lower <= v <= instance.upper for v in best)
@@ -284,10 +285,10 @@ def test_mmco_hill_climbing_respects_budget_and_bounds() -> None:
     assert values == sorted(values, reverse=True)  # best-so-far is monotone
 
 
-def test_mmco_hill_climbing_gets_stuck() -> None:
-    instance = build_mmco("toy", seed=0)
-    env, _solver, _best = _hill_climb(instance)
-    # the baseline stalls in a false positive, well above the tolerance
+def test_mmco_random_search_is_weak_on_hard() -> None:
+    instance = build_mmco("hard", seed=0)
+    env, _solver, _best = _run_solver(instance)
+    # pure random sampling cannot triangulate a 10-D signal
     assert env.report()["gap"] > instance.tolerance
 
 
@@ -303,8 +304,8 @@ def test_mmco_skeleton_and_query_guards() -> None:
         raise AssertionError("the MMCO skeleton should raise NotImplementedError")
 
     env2 = SignalEnvironment(instance)
-    solver = HillClimbingSolver(env2.evaluate, instance.dimension, instance.lower,
-                                instance.upper, instance.max_evaluations, seed=0)
+    solver = MMCORandomSearchSolver(env2.evaluate, instance.dimension, instance.lower,
+                                    instance.upper, instance.max_evaluations, seed=0)
     solver.solve()
     try:
         solver.query(solver.best_x)
@@ -319,12 +320,12 @@ def test_mmco_run_local(tmp_path: Path) -> None:
     build_mmco("toy", seed=0).save(inst_path)
     out = tmp_path / "run.json"
     report = run_local.main([
-        "--instance", str(inst_path), "--solver", "hill_climbing",
+        "--instance", str(inst_path), "--solver", "random_search",
         "--seed", "0", "--out", str(out),
     ])
     assert report["evaluations"] == report["budget"]
     data = json.loads(out.read_text(encoding="utf-8"))
-    assert data["solver"] == "hill_climbing"
+    assert data["solver"] == "random_search"
     assert data["report"]["evaluations"] == report["budget"]
 
 
@@ -339,7 +340,7 @@ def test_mmco_normalized_error() -> None:
 
 def test_mmco_ingestion_runs_honest_solver() -> None:
     instance = build_mmco("toy", seed=0)
-    record = run_solver(instance, HillClimbingSolver, wall_limit=30, cpu_limit=30, seed=0)
+    record = run_solver(instance, MMCORandomSearchSolver, wall_limit=30, cpu_limit=30, seed=0)
     assert record["valid"]
     assert record["evaluations"] == instance.max_evaluations
     assert len(record["best_x"]) == instance.dimension
@@ -373,30 +374,6 @@ def test_mmco_scoring_distance_and_penalty() -> None:
     assert per_instance["exact"] == 0.0
     assert per_instance["cheat"] == SEVERE_PENALTY
     assert score == SEVERE_PENALTY / 2
-
-
-def _solve(instance, solver_cls, **kwargs):
-    env = SignalEnvironment(instance)
-    solver = solver_cls(env.evaluate, instance.dimension, instance.lower, instance.upper,
-                        instance.max_evaluations, seed=0, **kwargs)
-    best = solver.solve()
-    return env, solver, best
-
-
-def test_mmco_pso_solves_toy_within_budget() -> None:
-    instance = build_mmco("toy", seed=0)
-    env, solver, best = _solve(instance, PSOSolver)
-    assert solver.queries <= instance.max_evaluations
-    assert len(best) == instance.dimension
-    assert all(instance.lower <= v <= instance.upper for v in best)
-    assert env.report()["hit"]  # PSO reaches the signal on the toy terrain
-
-
-def test_mmco_pso_beats_hill_climbing_on_toy() -> None:
-    instance = build_mmco("toy", seed=0)
-    env_pso, _solver, _best = _solve(instance, PSOSolver)
-    env_hc, _solver, _best = _solve(instance, HillClimbingSolver)
-    assert env_pso.report()["gap"] < env_hc.report()["gap"]
 
 
 def test_mmco_shifted_functions_are_well_posed() -> None:

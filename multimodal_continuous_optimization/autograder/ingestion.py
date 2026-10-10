@@ -21,7 +21,7 @@ Local test (from the repository root)::
 
     uv run python -m multimodal_continuous_optimization.autograder.ingestion \
         multimodal_continuous_optimization /tmp/mmco_out \
-        multimodal_continuous_optimization/hill_climbing_mmco.py
+        multimodal_continuous_optimization/random_search_mmco.py
 """
 
 from __future__ import annotations
