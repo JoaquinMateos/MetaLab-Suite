@@ -1,28 +1,28 @@
-"""Student API for the WFLO assignment.
+"""Student API and **skeleton** for the WFLO assignment.
 
-Write **one** solver by subclassing :class:`BaseWFLOSolver` and implementing
-``solve``::
+This file is the starting point for **your** metaheuristic. It contains
 
-    from wind_farm_layout_optimization.student_wflo import BaseWFLOSolver
+* :class:`BaseWFLOSolver` --- the abstract interface every solver must respect;
+* :class:`MySolver` --- an empty skeleton you fill in (search for ``TODO``);
+* the shared command-line contract and the subprocess runner used by the GUI and
+  the autograder.
 
-    class MySolver(BaseWFLOSolver):
-        name = "my_solver"
+Object-oriented recipe
+----------------------
+1. Create a subclass of :class:`BaseWFLOSolver`.
+2. Implement :meth:`solve` by walking **one** solution through the search space:
+   generate an initial layout, perturb it repeatedly, keep the best one, and
+   call :meth:`record` so the convergence curve can be plotted.
+3. Score any candidate with :meth:`score` (never re-implement the physics).
 
-        def solve(self, time_limit=None):
-            layout = self.env.random_layout(seed=self.seed)
-            ...  # your trajectory-based metaheuristic
-            return layout          # a list of N [x, y] turbine positions
+Run your solver with (from the repository root)::
 
-Your solver is executed as a script with the common command-line contract::
+    uv run python -m wind_farm_layout_optimization.student_wflo \
+        --instance wind_farm_layout_optimization/instances/toy.json \
+        --out wind_farm_layout_optimization/solutions/toy_mysolver.json
 
-    python <your_solver>.py --instance <instance.json> --out <layout.json> --seed <int>
-
-and must write a JSON object containing at least a ``"layout"`` key. The
-helper :func:`run_solver_script` (used by the GUI and the autograder) runs a
-solver script in a subprocess under a **strict CPU timeout**.
-
-This module also ships a deliberately weak :class:`GridSolver` baseline, so you
-always have something to compare against.
+The only complete algorithm you are given is the random search in
+``random_search_wflo.py``.
 """
 
 from __future__ import annotations
@@ -38,23 +38,19 @@ from pathlib import Path
 
 import numpy as np
 
-from wind_farm_layout_optimization.simulator_wflo import (
-    WindFarmEnvironment,
-    polygon_bounds,
-)
+from wind_farm_layout_optimization.simulator_wflo import WindFarmEnvironment
 
 ROOT = Path(__file__).resolve().parent.parent  # repository root
 
 
 # =============================================================================
-# Solver interface
+# The interface --- implement this
 # =============================================================================
 class BaseWFLOSolver(ABC):
-    """Base class for every WFLO solver.
+    """Abstract base class for every WFLO solver.
 
-    Subclasses must set :attr:`name` and implement :meth:`solve`. The
-    environment (``self.env``) is the *only* way to evaluate a layout; never
-    re-implement the physics.
+    A *trajectory-based* metaheuristic evolves a single incumbent layout. Use
+    ``self.env`` to evaluate layouts and ``self.rng`` for reproducibility.
     """
 
     name = "base"
@@ -64,14 +60,14 @@ class BaseWFLOSolver(ABC):
         self.instance = env.instance
         self.seed = seed
         self.rng = np.random.default_rng(seed)
-        self.history: list[float] = []  # optional: best objective per iteration
+        self.history: list[float] = []  # best-so-far objective per iteration
 
     @abstractmethod
     def solve(self, time_limit: float | None = None) -> list[list[float]]:
         """Return a layout: a list of ``N`` ``[x, y]`` turbine positions."""
         raise NotImplementedError
 
-    # -- convenience --------------------------------------------------------
+    # -- helpers ------------------------------------------------------------
     def score(self, layout: list[list[float]]) -> float:
         """Expected power (MW) of a layout --- the quantity to maximise."""
         return self.env.evaluate(layout)["expected_power_mw"]
@@ -82,40 +78,40 @@ class BaseWFLOSolver(ABC):
         self.history.append(best)
 
 
-class GridSolver(BaseWFLOSolver):
-    """Dummy baseline: place turbines on a regular, staggered grid.
+class MySolver(BaseWFLOSolver):
+    """Skeleton for **your** metaheuristic --- fill in :meth:`solve`.
 
-    The grid spacing equals the minimum spacing, so every pair of turbines is
-    separated by construction --- no overlapping turbines, no physics needed.
-    It is intentionally simple: beat it with your metaheuristic.
+    Replace the ``raise`` with your algorithm. Some design questions to answer:
+
+    * **Initial solution** --- random (``self.env.random_layout``) or greedy?
+    * **Neighbourhood** --- which move produces a neighbouring layout?
+    * **Acceptance rule** --- hill climbing (only improvements), simulated
+      annealing (accept worsening moves with ``exp(-delta / T)``), tabu, ...?
+
+    Every call to :meth:`record` adds a point to the convergence curve.
     """
 
-    name = "grid"
+    name = "my_solver"
+
+    def __init__(self, env: WindFarmEnvironment, seed: int = 0, iterations: int = 5000) -> None:
+        super().__init__(env, seed)
+        self.iterations = iterations
 
     def solve(self, time_limit: float | None = None) -> list[list[float]]:
-        inst = self.instance
-        x0, y0, x1, y1 = polygon_bounds(inst.terrain)
-        step = inst.min_spacing
+        # TODO 1 --- initial solution (must be feasible).
+        #     layout = self.env.random_layout(seed=self.seed)
 
-        candidates: list[list[float]] = []
-        n_rows = int((y1 - y0) // step) + 1
-        n_cols = int((x1 - x0) // step) + 1
-        for row in range(n_rows):
-            row_offset = step / 2.0 if row % 2 else 0.0  # stagger alternate rows
-            y = y0 + step / 2.0 + row * step
-            for col in range(n_cols):
-                x = x0 + step / 2.0 + col * step + row_offset
-                if self.env.inside_terrain(x, y) and not self.env.inside_exclusion(x, y):
-                    candidates.append([float(x), float(y)])
+        # TODO 2 --- walk a single solution through the search space.
+        #     while budget remains:
+        #         candidate = <perturb `layout`>
+        #         value = self.score(candidate)
+        #         <accept or reject>
+        #         self.record(best_value)
+        #     Hint: an infeasible candidate can be repaired or rejected. Check
+        #     feasibility with self.env.is_feasible(candidate).
 
-        # Pick N candidates spread evenly across the (row-major) candidate list.
-        if len(candidates) >= inst.n_turbines:
-            idx = np.linspace(0, len(candidates) - 1, inst.n_turbines).astype(int)
-            layout = [candidates[i] for i in dict.fromkeys(int(i) for i in idx)]
-        else:  # best effort: not enough room at the required spacing
-            layout = candidates
-
-        return layout
+        # TODO 3 --- return the best feasible layout found.
+        raise NotImplementedError("Implement MySolver.solve() --- see the TODO notes above.")
 
 
 # =============================================================================
@@ -146,7 +142,6 @@ def run_cli(solver_cls: type[BaseWFLOSolver], argv: list[str] | None = None) -> 
         "instance": env.instance.name,
         "layout": layout,
         "objective": report["expected_power_mw"],
-        "initial_objective": getattr(solver, "initial_value", None),
         "history": solver.history,
         "runtime_s": runtime,
         "report": report,
@@ -242,4 +237,8 @@ def run_solver_script(
 
 
 if __name__ == "__main__":
-    run_cli(GridSolver)
+    try:
+        run_cli(MySolver)
+    except NotImplementedError as exc:
+        print(f"[skeleton] {exc}")
+        print("[skeleton] Open student_wflo.py, implement MySolver.solve(), then run again.")

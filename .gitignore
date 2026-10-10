@@ -53,7 +53,6 @@ Thumbs.db
 # Generated problem data. Keep the folders, ignore their contents.
 wind_farm_layout_optimization/instances/*.json
 wind_farm_layout_optimization/solutions/**
-wind_farm_layout_optimization/starter/instances/*.json
 dynamic_drone_routing/instances/*.json
 dynamic_drone_routing/solutions/**
 !**/.gitkeep

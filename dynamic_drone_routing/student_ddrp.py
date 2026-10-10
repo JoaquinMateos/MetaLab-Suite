@@ -1,37 +1,33 @@
-"""Student API for the DDRP assignment.
+"""Student API and **skeleton** for the DDRP assignment.
 
-Write **one** dispatch policy by subclassing :class:`BaseSolver` and implementing
-``reoptimize``::
+This file is the starting point for **your** dispatch policy. It contains
 
-    from dynamic_drone_routing.student_ddrp import BaseSolver
+* :class:`BaseSolver` --- the abstract interface every policy must respect;
+* :class:`MySolver` --- an empty skeleton you fill in (search for ``TODO``);
+* the shared command-line contract used by the GUI and the autograder.
 
-    class MySolver(BaseSolver):
-        name = "my_solver"
+Object-oriented recipe
+----------------------
+1. Create a subclass of :class:`BaseSolver`.
+2. Implement :meth:`reoptimize`. The engine calls it at ``t = 0`` and at every
+   dynamic arrival; return ``{drone_id: [order_id, ...]}`` for the idle drones.
+3. Respect the payload capacity and the battery range **for the whole round
+   trip** (depot → stops → depot); otherwise the autograder invalidates you.
 
-        def reoptimize(self, state):
-            # state.pending_orders, state.idle_drones, state.instance, state.now
-            return {drone.id: [order_id, ...]}   # one ordered route per idle drone
-
-The simulator calls your policy at ``t = 0`` and again at every dynamic order
-arrival. A route must respect **both** the payload capacity and the battery
-range **for the whole round trip** (depot → stops → depot); otherwise the
-autograder invalidates the solution.
-
-A :class:`GreedySolver` (nearest neighbour with strict round-trip checks) is
-provided as a baseline you must beat.
-
-Run it with (from the repository root)::
+Run your policy with (from the repository root)::
 
     uv run python -m dynamic_drone_routing.student_ddrp \
         --instance dynamic_drone_routing/instances/toy.json \
-        --out dynamic_drone_routing/solutions/toy_greedy.json
+        --out dynamic_drone_routing/solutions/toy_mysolver.json
+
+The only complete algorithm you are given is the random search in
+``random_search_ddrp.py``.
 """
 
 from __future__ import annotations
 
 import argparse
 import json
-import math
 import time
 from abc import ABC, abstractmethod
 from collections.abc import Callable
@@ -48,10 +44,10 @@ DEFAULT_SOLUTIONS_DIR = Path(__file__).resolve().parent / "solutions"
 
 
 # =============================================================================
-# Solver interface
+# The interface --- implement this
 # =============================================================================
 class BaseSolver(ABC):
-    """Base class for every DDRP dispatch policy.
+    """Abstract base class for every DDRP dispatch policy.
 
     ``self.instance`` is available for look-ahead; the *only* thing the engine
     asks of you is :meth:`reoptimize`.
@@ -69,61 +65,33 @@ class BaseSolver(ABC):
         raise NotImplementedError
 
 
-class GreedySolver(BaseSolver):
-    """Nearest-neighbour baseline with strict battery and payload checks.
+class MySolver(BaseSolver):
+    """Skeleton for **your** dispatch policy --- fill in :meth:`reoptimize`.
 
-    For each idle drone it repeatedly appends the closest still-unassigned order
-    that keeps the **whole round trip** (depot → stops → depot) within the
-    battery range and the **total payload** within capacity. It is myopic ---
-    improve it (look-ahead, clustering, re-routing, restarts).
+    Replace the ``raise`` with your algorithm. Some design questions:
+
+    * how do you choose which orders to serve for each idle drone (nearest
+      neighbour, insertion, clustering, look-ahead)?
+    * how do you decide the order **within** a route?
+    * how do you react when a dynamic order arrives mid-route?
+
+    Remember the hard constraints: total payload <= ``state.instance.fleet.capacity``
+    and the whole round trip <= ``state.instance.fleet.max_range``.
     """
 
-    name = "greedy"
+    name = "my_solver"
 
     def reoptimize(self, state: ReoptState) -> dict[int, list[int]]:
-        depot = state.instance.depot
-        capacity = state.instance.fleet.capacity
-        max_range = state.instance.fleet.max_range
-
-        remaining = {order.id: order for order in state.pending_orders}
-        plan: dict[int, list[int]] = {}
-
-        for drone in state.idle_drones:
-            route: list[int] = []
-            load = 0.0  # payload currently on board (kg)
-            travelled = 0.0  # distance covered so far in this route
-            current = depot
-
-            while True:
-                best: tuple[float, int] | None = None
-                for order in remaining.values():
-                    if load + order.weight > capacity + 1e-9:
-                        continue  # payload limit
-                    leg = math.dist(current, order.position)
-                    # Strict round-trip battery check: after serving this order
-                    # the drone must still be able to return to the depot.
-                    if travelled + leg + math.dist(order.position, depot) > max_range + 1e-9:
-                        continue
-                    if best is None or leg < best[0]:
-                        best = (leg, order.id)
-                if best is None:
-                    break
-                leg, order_id = best
-                route.append(order_id)
-                travelled += leg
-                current = remaining[order_id].position
-                load += remaining[order_id].weight
-                del remaining[order_id]
-
-            if route:
-                plan[drone.id] = route
-
-        return plan
+        # TODO 1 --- look at state.pending_orders and state.idle_drones.
+        # TODO 2 --- build a route per idle drone, checking, for every candidate
+        #            order, the payload capacity and the round-trip battery.
+        # TODO 3 --- return {drone.id: [order_id, ...]} (only non-empty routes).
+        raise NotImplementedError("Implement MySolver.reoptimize() --- see the TODO notes.")
 
 
 def build_policy(instance: Instance, seed: int = 0) -> Callable[[ReoptState], dict[int, list[int]]]:
     """Return a dispatch policy callable (override this in your own module)."""
-    return GreedySolver(instance, seed=seed).reoptimize
+    return MySolver(instance, seed=seed).reoptimize
 
 
 # =============================================================================
@@ -162,4 +130,8 @@ def run_cli(solver_cls: type[BaseSolver], argv: list[str] | None = None) -> dict
 
 
 if __name__ == "__main__":
-    run_cli(GreedySolver)
+    try:
+        run_cli(MySolver)
+    except NotImplementedError as exc:
+        print(f"[skeleton] {exc}")
+        print("[skeleton] Open student_ddrp.py, implement MySolver.reoptimize(), then run again.")

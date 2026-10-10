@@ -58,9 +58,9 @@ and the objective function---the expected farm power. It is the \emph{theory};
 the technical instructions for generating instances and evaluating layouts are
 in the companion guide \texttt{wind\_farm\_layout\_optimization/README.md}.
 The simulator, the instance generator and an interactive GUI are provided; the
-\emph{metaheuristic is your task}. A random-search example and a
-simulated-annealing starter kit are included only to show the interface and to
-give you a template to improve.
+\emph{metaheuristic is your task}. A single random-search example and an
+object-oriented skeleton are included only to show the interface and to give you
+a structure to implement.
 \end{abstract}
 
 \tableofcontents
@@ -83,9 +83,9 @@ available terrain and by a minimum-spacing rule.
 You must implement \textbf{one trajectory-based metaheuristic} (simulated
 annealing, tabu search, iterated local search, \dots) that calls the provided
 simulator. You are expected to design the encoding, the neighbourhood and the
-acceptance rule yourselves. \textcolor{gray}{\emph{No finished algorithm is
-supplied: the random-search example and the simulated-annealing starter kit of
-Section~\ref{sec:example} are a starting point you are expected to improve.}}
+acceptance rule yourselves. \textcolor{gray}{\emph{The only algorithm supplied
+is the random-search example of Section~\ref{sec:example}; the object-oriented
+skeleton is there for you to fill in.}}
 
 %==============================================================================
 \section{The model}
@@ -234,12 +234,13 @@ The following components are provided (the first two must not be modified):
   \item the \textbf{instance generator}
   (\texttt{generate\_instances\_wflo.py}) --- builds the \texttt{toy} and
   \texttt{hard} instances (terrain, exclusion zones, $N$, wind rose);
-  \item an interactive \textbf{Streamlit GUI} (\texttt{app\_wflo.py}) and the
-  \textbf{student API} (\texttt{student\_wflo.py}), which also provides a dummy
-  grid baseline to compare against;
-  \item a \textbf{simulated-annealing starter kit}
-  (\texttt{simulated\_annealing\_wflo.py}) --- a complete, runnable template
-  whose improvement points are flagged with \texttt{\# IMPROVE} comments.
+  \item an interactive \textbf{Streamlit GUI} (\texttt{app\_wflo.py}) --- run a
+  solver and draw the terrain, the turbines and the wake cones;
+  \item the \textbf{only algorithm you are given}, a random search
+  (\texttt{random\_search\_wflo.py}), together with an \textbf{object-oriented
+  skeleton} (\texttt{student\_wflo.py}) for you to implement;
+  \item the \textbf{autograder backend} (\texttt{ingestion.py},
+  \texttt{score.py}).
 \end{itemize}
 
 \begin{center}
@@ -252,45 +253,44 @@ A layout is ``feasible'' when it satisfies (C1)--(C3); the simulator reports
 this for you, together with the objective and the efficiency.
 
 %==============================================================================
-\section{Starting points: random search and simulated annealing}
+\section{Starting point: random search}
 \label{sec:example}
 %==============================================================================
 
-Two starting points are supplied. The \emph{random search} below is the weakest
-possible algorithm --- use it to learn the interface. The
-\emph{simulated-annealing starter kit} that follows is a complete trajectory
-method that you are expected to tune and beat.
+The only algorithm supplied is a plain random search --- the weakest possible
+method. Use it to learn the interface; the real work is yours.
 
-\begin{lstlisting}[style=py,caption={The provided random-search example.}]
-def random_search(env, iterations, seed):
-    rng = np.random.default_rng(seed)
-    best_layout, best_value = None, float("-inf")
-    for _ in range(iterations):
-        layout = env.random_layout(seed=int(rng.integers(1, 2**31)))
-        value = env.evaluate(layout)["expected_power_mw"]
-        if value > best_value:
-            best_layout, best_value = layout, value
-    return best_layout, best_value
+\begin{lstlisting}[style=py,caption={The provided random-search example (object-oriented).}]
+class RandomSearchSolver(BaseWFLOSolver):
+    name = "random_search"
+
+    def solve(self, time_limit=None):
+        best_layout = self.env.random_layout(seed=self.seed)
+        best_value = self.score(best_layout)
+        self.record(best_value)
+        for _ in range(self.iterations):
+            layout = self.env.random_layout(seed=...)
+            value = self.score(layout)
+            if value > best_value:
+                best_layout, best_value = layout, value
+            self.record(best_value)
+        return best_layout
 \end{lstlisting}
 
 \noindent
-Everything you write should follow the same pattern: produce a candidate
-\texttt{layout} and score it with
-\texttt{env.evaluate(layout)["expected\_power\_mw"]}. The design of the move
-(neighbourhood) and of the acceptance rule is entirely up to you.
+Following the same pattern, you implement \texttt{MySolver.solve} in
+\texttt{student\_wflo.py}: produce a candidate \texttt{layout}, score it with
+\texttt{self.score(layout)}, keep the best one, and call \texttt{self.record(...)}
+so the GUI can plot the convergence curve. The design of the move (neighbourhood)
+and of the acceptance rule is entirely up to you.
 
-\subsection*{Simulated-annealing starter kit}
+\subsection*{Your skeleton (object-oriented)}
 
-\texttt{SimulatedAnnealingWFLOSolver} implements the four ingredients of any
-trajectory method: (i) a \emph{valid random initial layout}; (ii) a
-\emph{perturbation} that moves one randomly chosen turbine by a continuous
-Gaussian step inside the terrain; (iii) a \emph{geometric cooling schedule}
-$T \leftarrow \alpha T$; and (iv) the \emph{Metropolis} acceptance rule ---
-accept improving moves, and accept a worsening move of size $\Delta<0$ with
-probability $e^{\Delta/T}$. Every improvement point is flagged with a
-\texttt{\# IMPROVE} comment: a better initial solution, a smarter neighbourhood,
-repairing infeasible candidates, an adaptive schedule, and alternative
-acceptance rules.
+\texttt{BaseWFLOSolver} is the abstract interface every solver must respect, and
+\texttt{MySolver} is an empty subclass with \texttt{TODO} markers. Implementing it
+means deciding, for instance, the initial solution (random or greedy), the
+perturbation that produces a neighbouring layout, and the acceptance rule (hill
+climbing, simulated annealing with a cooling schedule, tabu search, \dots).
 
 %==============================================================================
 \section{Deliverables}

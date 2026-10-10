@@ -23,6 +23,7 @@ from __future__ import annotations
 
 import argparse
 import importlib.util
+import inspect
 import json
 import signal
 import sys
@@ -85,7 +86,11 @@ def build_policy(module: ModuleType, instance: Instance, seed: int):
     if hasattr(module, "build_policy"):
         return module.build_policy(instance, seed=seed)
     for value in vars(module).values():
-        if isinstance(value, type) and callable(getattr(value, "reoptimize", None)):
+        if (
+            isinstance(value, type)
+            and not inspect.isabstract(value)
+            and callable(getattr(value, "reoptimize", None))
+        ):
             return value(instance, seed=seed).reoptimize
     if callable(getattr(module, "reoptimize", None)):
         return module.reoptimize

@@ -31,8 +31,7 @@ one lockfile, one virtual environment, many problems.
 | Folder | Problem | Objective | Baseline |
 | --- | --- | --- | --- |
 | [`wind_farm_layout_optimization/`](wind_farm_layout_optimization/README.md) | Wind Farm Layout Optimization (WFLO) — **assignment** | maximise expected power | random search (example only) |
-| ↳ [`…/starter/`](wind_farm_layout_optimization/starter/README.md) | WFLO warm-up — grid hill-climber skeleton | maximise expected power | random search |
-| [`dynamic_drone_routing/`](dynamic_drone_routing/README.md) | Dynamic Drone Routing Problem (DDRP) | minimise distance + unserved penalty | greedy insertion |
+| [`dynamic_drone_routing/`](dynamic_drone_routing/README.md) | Dynamic Drone Routing Problem (DDRP) — **assignment** | minimise distance + unserved penalty | random search (example only) |
 
 > More problems are added over time. Each new folder ships with its own
 > comprehensive `README.md` (see the suite rule below).
@@ -86,9 +85,10 @@ uv sync
 
 # 3. try the wind-farm assignment
 uv run python -m wind_farm_layout_optimization.generate_instances_wflo --name all
-uv run python -m wind_farm_layout_optimization.example_random_search \
-    --instance wind_farm_layout_optimization/instances/toy.json --iterations 2000
-uv run streamlit run wind_farm_layout_optimization/starter/app.py
+uv run python -m wind_farm_layout_optimization.random_search_wflo \
+    --instance wind_farm_layout_optimization/instances/toy.json \
+    --out wind_farm_layout_optimization/solutions/toy_random.json
+uv run streamlit run wind_farm_layout_optimization/app_wflo.py
 ```
 
 Add `--group dev` to be explicit about the development tools (pytest, ruff,
@@ -117,19 +117,18 @@ MetaLab Suite/
 │   ├── simulator_wflo.py          # GIVEN: WindFarmEnvironment (Jensen wakes)
 │   ├── generate_instances_wflo.py # GIVEN: builds toy + hard instances
 │   ├── app_wflo.py                # GIVEN: Streamlit GUI (run solver + wake cones)
-│   ├── student_wflo.py            # GIVEN: BaseWFLOSolver API + GridSolver
-│   ├── simulated_annealing_wflo.py# STARTER KIT: SimulatedAnnealingWFLOSolver
-│   ├── example_random_search.py   # GIVEN: the only algorithm (an example)
+│   ├── random_search_wflo.py      # GIVEN: the ONLY algorithm (random search)
+│   ├── student_wflo.py            # YOUR FILE: OOP skeleton (BaseWFLOSolver + MySolver)
 │   ├── ingestion.py  score.py     # BACKEND: Codabench autograder
 │   ├── README.md                  # technical execution guide
-│   ├── starter/                   # optional warm-up (grid + hill-climber skeleton)
 │   ├── instances/                 # generated data (git-ignored)
 │   └── solutions/                 # your solver output (git-ignored)
 └── dynamic_drone_routing/         # Problem #2 — SimPy simulation assignment
-    ├── simulator_ddrp.py          # GIVEN: SimPy engine + greedy_planner
+    ├── simulator_ddrp.py          # GIVEN: SimPy engine
     ├── generate_instances_ddrp.py # GIVEN: builds toy + hard workdays
     ├── app_ddrp.py                # GIVEN: Streamlit visualiser (timeline)
-    ├── student_ddrp.py            # GIVEN: BaseSolver + GreedySolver
+    ├── random_search_ddrp.py      # GIVEN: the ONLY algorithm (random search)
+    ├── student_ddrp.py            # YOUR FILE: OOP skeleton (BaseSolver + MySolver)
     ├── ingestion.py  score.py     # BACKEND: Codabench autograder
     ├── README.md                  # technical execution guide
     ├── instances/                 # generated workdays (git-ignored)
@@ -138,21 +137,19 @@ MetaLab Suite/
 
 ### Anatomy of a problem folder
 
-Both problems follow a **“given vs. yours”** split: the physics/simulation is
-given, the solver is the deliverable.
+Both problems follow a **“given vs. yours”** split: only the physics/simulation,
+the GUI, a random-search example and a skeleton are given; the solver is the
+deliverable.
 
 | File | Purpose |
 | --- | --- |
 | `simulator_<problem>.py` | Given: the objective / simulation (the "ground truth") |
 | `generate_instances_<problem>.py` | Given: builds the `toy` and `hard` instances |
+| `app_<problem>.py` | Given: Streamlit GUI |
+| `random_search_<problem>.py` | Given: the **only** algorithm (random search, OOP) |
+| `student_<problem>.py` | **Your file**: OOP skeleton (abstract base + `MySolver`) |
+| `ingestion.py` / `score.py` | Backend: Codabench autograder |
 | `README.md` | Technical guide (referenced by the problem's PDF) |
-| *your solver* | **The deliverable**: a placement solver (WFLO) or a dispatch policy (DDRP) |
-
-The WFLO assignment additionally ships a Streamlit GUI (`app_wflo.py`), a student
-API (`student_wflo.py`) with a `GridSolver` baseline, a simulated-annealing
-starter kit, and a Codabench autograder (`ingestion.py` / `score.py`). DDRP
-ships its own Streamlit visualiser (`app_ddrp.py`), a student API
-(`student_ddrp.py`) with a `GreedySolver` baseline, and a Codabench autograder.
 
 ---
 

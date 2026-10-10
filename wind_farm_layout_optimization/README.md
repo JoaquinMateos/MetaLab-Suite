@@ -8,11 +8,10 @@ physics, objective and constraints) is in the companion document
 [`../docs/wind_farm_layout_optimization.pdf`](../docs/wind_farm_layout_optimization.pdf);
 **this README is the technical guide** for running everything.
 
-> **You are given the simulator, the generator, a GUI and a simulated-annealing
-> starter kit. Your job is to write (or substantially improve) the
-> metaheuristic.** The random-search example and the SA starter kit are there so
-> you can see how to call the simulator — every part worth improving is flagged
-> with a `# IMPROVE:` comment.
+> **You are given the simulator, the generator, a GUI, a random-search example
+> and a skeleton.** Your job is to implement the metaheuristic in
+> `student_wflo.py`. The random search is the *only* algorithm provided — every
+> other method is yours to design.
 
 ---
 
@@ -34,16 +33,14 @@ formulation.
 wind_farm_layout_optimization/
 ├── simulator_wflo.py           # GIVEN — WindFarmEnvironment (the ground truth)
 ├── generate_instances_wflo.py  # GIVEN — builds the 'toy' and 'hard' instances
-├── app_wflo.py                 # GIVEN — Streamlit GUI (load, run, visualise)
-├── student_wflo.py             # GIVEN — BaseWFLOSolver + a dummy GridSolver
-├── simulated_annealing_wflo.py # STARTER KIT — SimulatedAnnealingWFLOSolver
-├── example_random_search.py    # GIVEN — the only algorithm (a mere example)
+├── app_wflo.py                 # GIVEN — Streamlit GUI (run + visualise)
+├── random_search_wflo.py       # GIVEN — the ONLY algorithm (a random search)
+├── student_wflo.py             # YOUR FILE — OOP skeleton (BaseWFLOSolver + MySolver)
 ├── ingestion.py                # BACKEND — Codabench ingestion program
 ├── score.py                    # BACKEND — Codabench scoring program
 ├── README.md                   # this technical guide
 ├── instances/                  # generated instances: toy.json, hard.json
-├── solutions/                  # where your solver writes layouts
-└── starter/                    # optional warm-up (tiny grid exercise)
+└── solutions/                  # where your solver writes layouts
 ```
 
 | File | Role |
@@ -51,9 +48,8 @@ wind_farm_layout_optimization/
 | `simulator_wflo.py` | `WindFarmEnvironment`: Jensen wake physics, power, feasibility |
 | `generate_instances_wflo.py` | CLI that writes `instances/toy.json` and `instances/hard.json` |
 | `app_wflo.py` | Streamlit GUI: run a solver and draw the layout + wake cones |
-| `student_wflo.py` | Solver API (`BaseWFLOSolver`) and the `GridSolver` baseline |
-| `simulated_annealing_wflo.py` | **Starter kit**: `SimulatedAnnealingWFLOSolver` to tune and beat |
-| `example_random_search.py` | Minimal random-search example (replace it!) |
+| `random_search_wflo.py` | The only algorithm given: `RandomSearchSolver(BaseWFLOSolver)` |
+| `student_wflo.py` | **Your file**: `BaseWFLOSolver` interface + `MySolver` skeleton |
 | `ingestion.py`, `score.py` | Autograder backend (strict timeout, constraints, scoring) |
 
 All commands are run **from the repository root**, after `uv sync` (the GUI can
@@ -66,11 +62,7 @@ also be launched from inside this folder — see §3.3).
 ### 3.1 Generate the instances
 
 ```bash
-# both the 'toy' and 'hard' instances
 uv run python -m wind_farm_layout_optimization.generate_instances_wflo --name all
-
-# or a single one
-uv run python -m wind_farm_layout_optimization.generate_instances_wflo --name toy
 uv run python -m wind_farm_layout_optimization.generate_instances_wflo --name hard --seed 42
 ```
 
@@ -89,9 +81,8 @@ uv run python -m wind_farm_layout_optimization.simulator_wflo \
 
 ### 3.3 Local GUI (Streamlit) 🌀
 
-The interactive studio lets you **load a JSON instance**, **pick a Python
-solver script**, run it under a time limit, and see the terrain, the exclusion
-zones, the turbines and the **wind wake cones**.
+Load a JSON instance, pick a solver script, run it under a time limit, and see
+the terrain, the exclusion zones, the turbines and the **wind wake cones**.
 
 From **inside this folder** (exactly as requested):
 
@@ -105,105 +96,61 @@ or from the **repository root**:
 uv run streamlit run wind_farm_layout_optimization/app_wflo.py
 ```
 
-Streamlit prints a local URL (default <http://localhost:8501>). In the browser:
+Streamlit prints a local URL (default <http://localhost:8501>). Pick an
+instance, pick a solver (`random_search_wflo.py`, `student_wflo.py`, or your
+own), set the seed / time limit and press **Run solver**.
 
-1. pick an instance (`toy` / `hard`) in the sidebar;
-2. pick a solver script (e.g. `student_wflo.py`, `example_random_search.py`, or
-   your own — any script following the command-line contract of §4);
-3. set the seed and the time limit, then press **Run solver**;
-4. inspect the layout, the wake cones and the convergence curve.
-
-### 3.4 The random-search example (your starting point)
+### 3.4 The only algorithm: random search
 
 ```bash
-uv run python -m wind_farm_layout_optimization.example_random_search \
-    --instance wind_farm_layout_optimization/instances/toy.json --iterations 2000
+uv run python -m wind_farm_layout_optimization.random_search_wflo \
+    --instance wind_farm_layout_optimization/instances/toy.json \
+    --out wind_farm_layout_optimization/solutions/toy_random.json
 ```
 
-> The random-search example and the SA starter kit are the only algorithms
-> handed to you; everything else is yours to design and improve.
+Read it to learn how to talk to the simulator; then beat it in
+`student_wflo.py`.
 
 ---
 
-## 4. Student API — `student_wflo.py`
+## 4. Your skeleton — object-oriented
 
-Write one solver by subclassing `BaseWFLOSolver`:
+Open `student_wflo.py`. It contains the abstract interface and an empty
+`MySolver`:
 
 ```python
-from wind_farm_layout_optimization.student_wflo import BaseWFLOSolver
+class BaseWFLOSolver(ABC):
+    def __init__(self, env, seed=0): ...
+    @abstractmethod
+    def solve(self, time_limit=None) -> list[list[float]]: ...
 
-class MySolver(BaseWFLOSolver):
-    name = "my_solver"
-
+class MySolver(BaseWFLOSolver):   # <- implement this
     def solve(self, time_limit=None):
-        layout = self.env.random_layout(seed=self.seed)   # or any start
-        # ... your trajectory-based metaheuristic ...
-        return layout            # a list of N [x, y] turbine positions
+        raise NotImplementedError
 ```
 
-Every solver script follows the **command-line contract**
+Implement `solve` by walking **one** solution through the search space:
 
-```
-python <your_solver>.py --instance <instance.json> --out <layout.json> --seed <int>
-```
+1. **initial solution** — e.g. `self.env.random_layout(seed=self.seed)`;
+2. **perturbation** — a move that produces a neighbouring layout;
+3. **acceptance** — hill climbing, simulated annealing, tabu, ...;
+4. call `self.record(value)` each iteration (the GUI plots the convergence
+   curve) and return the best feasible layout.
 
-and writes a JSON file containing at least a `"layout"` key (see
-`run_cli` / `run_solver_script` in `student_wflo.py`). Use only
-`self.env.evaluate(layout)` to score a layout — never re-implement the physics.
-
-The provided **`GridSolver`** is a dummy baseline: it lays turbines on a
-staggered grid with the minimum spacing (so it is feasible by construction).
-Beat it.
+Use `self.score(layout)` to evaluate and `self.env.is_feasible(layout)` to check
+constraints. Run it with:
 
 ```bash
 uv run python -m wind_farm_layout_optimization.student_wflo \
     --instance wind_farm_layout_optimization/instances/toy.json \
-    --out /tmp/toy_grid.json
+    --out wind_farm_layout_optimization/solutions/toy_mysolver.json
 ```
+
+Until you implement `solve`, the command prints a friendly reminder.
 
 ---
 
-## 5. Starter kit — Simulated Annealing
-
-`simulated_annealing_wflo.py` is a **complete, runnable** trajectory-based
-metaheuristic built on the student API. Read it, tune it, and beat it — every
-improvement point is flagged with a `# IMPROVE:` comment.
-
-It contains the four ingredients of any trajectory method:
-
-1. **Initial solution** — `initial_solution()` draws a valid random layout from
-   the simulator (a rejection sampler that respects terrain, exclusions and
-   spacing).
-2. **Perturbation** — `perturb()` picks a random turbine and moves it by a
-   continuous Gaussian step, clipped to the terrain bounding box.
-3. **Cooling schedule** — geometric: `T <- alpha * T`, with `alpha = 0.998`.
-4. **Metropolis acceptance** — keep improvements; keep a worsening move with
-   probability `exp(delta / T)`.
-
-Run it (it is also selectable in the Streamlit GUI):
-
-```bash
-uv run python -m wind_farm_layout_optimization.simulated_annealing_wflo \
-    --instance wind_farm_layout_optimization/instances/toy.json \
-    --out wind_farm_layout_optimization/solutions/toy_sa.json
-
-uv run python -m wind_farm_layout_optimization.simulated_annealing_wflo \
-    --instance wind_farm_layout_optimization/instances/hard.json \
-    --out wind_farm_layout_optimization/solutions/hard_sa.json
-```
-
-**Where to improve it** (follow the `# IMPROVE:` comments):
-
-* a **better initial solution** (greedy construction, multi-start);
-* a **better neighbourhood** (swap moves, block moves, temperature-aware step
-  size, reflecting at the boundary);
-* **repair** infeasible candidates (or add a penalty term) instead of rejecting;
-* an **adaptive schedule**, reheating or restarts;
-* other acceptance rules (threshold accepting, late acceptance, greedy).
-
-## 6. Autograder (Codabench backend)
-
-`ingestion.py` and `score.py` implement the evaluation used on Codabench.
+## 5. Autograder (Codabench backend)
 
 * **`ingestion.py`** runs the submitted solver on every instance, in a
   subprocess under a **strict CPU + wall timeout**, then verifies the physical
@@ -216,12 +163,10 @@ uv run python -m wind_farm_layout_optimization.simulated_annealing_wflo \
 Local run (from the repository root):
 
 ```bash
-# 1. run a solver and verify it (here: the dummy GridSolver)
 uv run python -m wind_farm_layout_optimization.ingestion \
     wind_farm_layout_optimization /tmp/wflo_out \
-    wind_farm_layout_optimization/student_wflo.py --time-limit 60
+    wind_farm_layout_optimization/random_search_wflo.py --time-limit 60
 
-# 2. turn the predictions into a score
 uv run python -m wind_farm_layout_optimization.score /tmp/wflo_out /tmp/wflo_scores
 ```
 
@@ -231,9 +176,9 @@ On Codabench the programs are invoked positionally as
 
 ---
 
-## 7. Deliverables
+## 6. Deliverables
 
-1. A Python module implementing **one trajectory-based metaheuristic** as a
+1. `student_wflo.py` implementing **one trajectory-based metaheuristic** as a
    `BaseWFLOSolver` subclass, using `WindFarmEnvironment` without modifying it.
 2. Your best layouts for the `toy` and `hard` instances under `solutions/`.
 3. A short report: convergence curve, best expected power/efficiency, and how

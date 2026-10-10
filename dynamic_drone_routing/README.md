@@ -9,9 +9,10 @@ battery constraints, the rolling-horizon idea) is in the companion document
 **this README is the technical guide** to the simulation, the GUI and the
 autograder.
 
-> **You are given the simulator, the instance generator and a visualiser.** Your
-> job is to write the **dispatch policy** (`reoptimize`). A greedy baseline is
-> provided so everything runs out of the box — beat it.
+> **You are given the simulator, the generator, a GUI, a random-search example
+> and a skeleton.** Your job is to implement the dispatch policy in
+> `student_ddrp.py`. The random search is the *only* algorithm provided — every
+> other policy is yours to design.
 
 ---
 
@@ -33,7 +34,8 @@ and in what order**, minimising `Distance + 1000 x Unserved + 10 x Swaps`.
 
 The engine is in `simulator_ddrp.py` and is built on
 [**SimPy**](https://simpy.readthedocs.io/), a process-based discrete-event
-simulator.
+simulator. The dispatch policy is **pluggable**: you pass a callable
+`reoptimize(state) -> {drone_id: [order_id, ...]}`.
 
 ### Entities
 
@@ -72,19 +74,6 @@ t1>0   dynamic order arrives ──► PAUSE ──► reoptimize() ──► RE
 t=480  workday ends ──► report()
 ```
 
-### The dispatch policy — your task
-
-The policy is a plain callable:
-
-```python
-def my_policy(state: ReoptState) -> dict[int, list[int]]:
-    # state.now             -> current simulation time
-    # state.pending_orders  -> released orders not yet delivered or planned
-    # state.idle_drones     -> drones parked at the depot (drone.id, .position, ...)
-    # state.instance        -> depot, fleet, orders
-    return {drone.id: [order_id, ...]}   # one ordered route per idle drone
-```
-
 A route is feasible when its **round trip** (depot → stops → depot) fits within
 `max_range` and its **total payload** is within `capacity`.
 
@@ -95,10 +84,11 @@ A route is feasible when its **round trip** (depot → stops → depot) fits wit
 ```
 dynamic_drone_routing/
 ├── __init__.py                    # package marker
-├── simulator_ddrp.py              # GIVEN — SimPy engine + greedy_planner
+├── simulator_ddrp.py              # GIVEN — SimPy engine
 ├── generate_instances_ddrp.py     # GIVEN — builds the 'toy' and 'hard' workdays
 ├── app_ddrp.py                    # GIVEN — Streamlit visualiser
-├── student_ddrp.py                # GIVEN — BaseSolver + GreedySolver baseline
+├── random_search_ddrp.py          # GIVEN — the ONLY algorithm (a random search)
+├── student_ddrp.py                # YOUR FILE — OOP skeleton (BaseSolver + MySolver)
 ├── ingestion.py                   # BACKEND — Codabench ingestion (per-event CPU timeout)
 ├── score.py                       # BACKEND — Codabench scoring
 ├── README.md                      # this technical guide
@@ -130,12 +120,15 @@ uv run python -m dynamic_drone_routing.generate_instances_ddrp --name hard --see
 * **hard** — 6 drones, Q = 2.5 kg, range = 34, clustered demand: 20 static + 25
   dynamic orders.
 
-### 4.2 Run the simulator (greedy baseline)
+### 4.2 Run the simulator
 
 ```bash
 uv run python -m dynamic_drone_routing.simulator_ddrp \
     --instance dynamic_drone_routing/instances/toy.json
 ```
+
+(The simulator demo uses the random-search policy; with your own policy, see
+§4.5.)
 
 ### 4.3 Local GUI (Streamlit) 🚁
 
@@ -158,37 +151,45 @@ Streamlit prints a local URL (default <http://localhost:8501>). Pick a workday
 and a policy, press **Run simulation**, then scrub the timeline: **dynamic
 orders light up as they appear** (grey → orange) and turn green once delivered.
 
-### 4.4 Student API — `student_ddrp.py`
+### 4.4 Your skeleton — object-oriented
 
-Write your policy by subclassing `BaseSolver`:
+Open `student_ddrp.py`. It contains the abstract interface and an empty
+`MySolver`:
 
 ```python
 from dynamic_drone_routing.student_ddrp import BaseSolver
 
-class MySolver(BaseSolver):
-    name = "my_solver"
-
+class MySolver(BaseSolver):        # <- implement this
     def reoptimize(self, state):
-        return {drone.id: [...] for drone in state.idle_drones}
+        raise NotImplementedError
 ```
 
-The provided **`GreedySolver`** is the nearest-neighbour baseline with **strict
-round-trip checks**: it never adds an order that would break the payload
-capacity or leave the drone unable to return to the depot on one battery. Run it
-with:
+Implement `reoptimize` by returning one route per idle drone. Run it with:
 
 ```bash
 uv run python -m dynamic_drone_routing.student_ddrp \
     --instance dynamic_drone_routing/instances/toy.json \
-    --out dynamic_drone_routing/solutions/toy_greedy.json
+    --out dynamic_drone_routing/solutions/toy_mysolver.json
 ```
 
-### 4.5 Plug in your own policy
+Until you implement it, the command prints a friendly reminder.
+
+### 4.5 The only algorithm: random search
+
+```bash
+uv run python -m dynamic_drone_routing.random_search_ddrp \
+    --instance dynamic_drone_routing/instances/toy.json \
+    --out dynamic_drone_routing/solutions/toy_random.json
+```
+
+To use **your own** policy in the simulator:
 
 ```python
 from dynamic_drone_routing.simulator_ddrp import Instance, SimulationEnvironment
-sim = SimulationEnvironment(Instance.load("dynamic_drone_routing/instances/toy.json"),
-                            reoptimize=my_policy)
+from dynamic_drone_routing.student_ddrp import MySolver
+
+instance = Instance.load("dynamic_drone_routing/instances/toy.json")
+sim = SimulationEnvironment(instance, reoptimize=MySolver(instance).reoptimize)
 report = sim.run()
 print(report["objective"], report["valid"])
 ```
@@ -209,7 +210,7 @@ Local run (from the repository root):
 
 ```bash
 uv run python -m dynamic_drone_routing.ingestion \
-    dynamic_drone_routing /tmp/ddrp_out dynamic_drone_routing/student_ddrp.py \
+    dynamic_drone_routing /tmp/ddrp_out dynamic_drone_routing/random_search_ddrp.py \
     --per-event-cpu 2 --total-wall 60
 
 uv run python -m dynamic_drone_routing.score /tmp/ddrp_out /tmp/ddrp_scores
@@ -233,10 +234,10 @@ may carry several parcels at once. The simulator records any violation
 
 ## 7. Deliverables
 
-1. A Python module implementing **one dispatch policy**
+1. `student_ddrp.py` implementing **one dispatch policy**
    `reoptimize(state) -> {drone_id: [order_id, ...]}`, using the simulator
    without modifying it.
-2. A comparison of your policy against the `GreedySolver` baseline on `toy` and
+2. A comparison of your policy against the `RandomSearchPolicy` on `toy` and
    `hard` (score, served count, makespan).
 3. A short explanation of how you handle dynamic arrivals (re-optimisation
    frequency, greedy vs. look-ahead, restarts).

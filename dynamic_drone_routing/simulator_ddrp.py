@@ -19,8 +19,8 @@ Model
 
 The dispatch policy is pluggable: pass your own ``reoptimize`` callable with the
 signature ``reoptimize(state: ReoptState) -> dict[int, list[int]]`` mapping a
-drone id to an ordered list of order ids. A simple greedy planner is provided so
-the simulator runs out of the box.
+drone id to an ordered list of order ids. The only example policy provided is
+the random search in ``random_search_ddrp.py``.
 
 Run the demo with (from the repository root)::
 
@@ -205,48 +205,6 @@ class Drone:
 
 
 # =============================================================================
-# Dispatch policy (default: nearest-feasible greedy)
-# =============================================================================
-def greedy_planner(state: ReoptState) -> dict[int, list[int]]:
-    """Assign each idle drone a route of nearby feasible orders.
-
-    Feasibility: the round-trip distance must not exceed the drone range and the
-    total payload must not exceed the capacity. This is the baseline a student
-    is expected to beat.
-    """
-    remaining = {o.id: o for o in state.pending_orders}
-    depot = state.instance.depot
-    plan: dict[int, list[int]] = {}
-
-    for drone in state.idle_drones:
-        route: list[int] = []
-        load = 0.0
-        travelled = 0.0
-        current = depot
-        while True:
-            best: tuple[float, int, Order] | None = None
-            for order in remaining.values():
-                if load + order.weight > drone.spec.capacity:
-                    continue
-                leg = math.dist(current, order.position)
-                if travelled + leg + math.dist(order.position, depot) > drone.spec.max_range:
-                    continue  # could not get back to the depot
-                if best is None or leg < best[0]:
-                    best = (leg, order.id, order)
-            if best is None:
-                break
-            leg, order_id, order = best
-            route.append(order_id)
-            travelled += leg
-            current = order.position
-            load += order.weight
-            del remaining[order_id]
-        if route:
-            plan[drone.id] = route
-    return plan
-
-
-# =============================================================================
 # Simulation environment
 # =============================================================================
 class SimulationEnvironment:
@@ -255,12 +213,12 @@ class SimulationEnvironment:
     def __init__(
         self,
         instance: Instance,
-        reoptimize: Callable[[ReoptState], dict[int, list[int]]] | None = None,
+        reoptimize: Callable[[ReoptState], dict[int, list[int]]],
         seed: int = 0,
     ) -> None:
         self.instance = instance
         self.seed = seed
-        self.reoptimize_fn = reoptimize or greedy_planner
+        self.reoptimize_fn = reoptimize
 
         self.env = simpy.Environment()
         self.orders_by_id = {o.id: o for o in instance.orders}
@@ -433,7 +391,14 @@ def main(argv: list[str] | None = None) -> dict:
     args = parser.parse_args(argv)
 
     instance = Instance.load(args.instance)
-    sim = SimulationEnvironment(instance, seed=args.seed)
+
+    # The simulator needs a dispatch policy; the demo uses the random-search
+    # example shipped in random_search_ddrp.py. (Imported here to avoid a
+    # circular import at module load time.)
+    from dynamic_drone_routing.random_search_ddrp import RandomSearchPolicy
+
+    policy = RandomSearchPolicy(instance, seed=args.seed).reoptimize
+    sim = SimulationEnvironment(instance, reoptimize=policy, seed=args.seed)
     result = sim.run()
 
     print(f"Instance        : {instance.name} ({result['total_orders']} orders, "
