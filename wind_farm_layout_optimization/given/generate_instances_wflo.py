@@ -15,7 +15,7 @@ Two ready-made instances are provided:
 
 Run it with (from the repository root)::
 
-    uv run python -m wind_farm_layout_optimization.generate_instances_wflo --name all
+    uv run python -m wind_farm_layout_optimization.given.generate_instances_wflo --name all
 """
 
 from __future__ import annotations
@@ -25,13 +25,13 @@ from pathlib import Path
 
 import numpy as np
 
-from wind_farm_layout_optimization.simulator_wflo import (
+from wind_farm_layout_optimization.given.simulator_wflo import (
     Turbine,
     WindFarmInstance,
     WindScenario,
 )
 
-DEFAULT_INSTANCES_DIR = Path(__file__).resolve().parent / "instances"
+DEFAULT_INSTANCES_DIR = Path(__file__).resolve().parent.parent / "instances"
 
 
 # ---------------------------------------------------------------------------

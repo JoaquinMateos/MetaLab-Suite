@@ -11,17 +11,21 @@ from pathlib import Path
 
 import wind_farm_layout_optimization
 from dynamic_drone_routing import student_ddrp
-from dynamic_drone_routing.generate_instances_ddrp import assert_feasible
-from dynamic_drone_routing.generate_instances_ddrp import build as build_ddrp
-from dynamic_drone_routing.ingestion import EventTimeout, make_timed_policy, run_instance
+from dynamic_drone_routing.autograder.ingestion import (
+    EventTimeout,
+    make_timed_policy,
+    run_instance,
+)
+from dynamic_drone_routing.autograder.score import compute_scores as compute_ddrp_scores
+from dynamic_drone_routing.given.generate_instances_ddrp import assert_feasible
+from dynamic_drone_routing.given.generate_instances_ddrp import build as build_ddrp
+from dynamic_drone_routing.given.simulator_ddrp import ReoptState, SimulationEnvironment
 from dynamic_drone_routing.random_search_ddrp import RandomSearchPolicy
-from dynamic_drone_routing.score import compute_scores as compute_ddrp_scores
-from dynamic_drone_routing.simulator_ddrp import ReoptState, SimulationEnvironment
 from wind_farm_layout_optimization import student_wflo
-from wind_farm_layout_optimization.generate_instances_wflo import build as build_wflo
+from wind_farm_layout_optimization.autograder.score import compute_scores
+from wind_farm_layout_optimization.given.generate_instances_wflo import build as build_wflo
+from wind_farm_layout_optimization.given.simulator_wflo import WindFarmEnvironment
 from wind_farm_layout_optimization.random_search_wflo import RandomSearchSolver
-from wind_farm_layout_optimization.score import compute_scores
-from wind_farm_layout_optimization.simulator_wflo import WindFarmEnvironment
 
 
 # ===========================================================================

@@ -31,7 +31,7 @@ import time
 from pathlib import Path
 from types import ModuleType
 
-from dynamic_drone_routing.simulator_ddrp import Instance, SimulationEnvironment
+from dynamic_drone_routing.given.simulator_ddrp import Instance, SimulationEnvironment
 
 INVALID_PENALTY = 1e9
 

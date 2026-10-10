@@ -20,7 +20,7 @@ Two ready-made instances are provided:
 
 Run it with (from the repository root)::
 
-    uv run python -m dynamic_drone_routing.generate_instances_ddrp --name all
+    uv run python -m dynamic_drone_routing.given.generate_instances_ddrp --name all
 """
 
 from __future__ import annotations
@@ -31,9 +31,9 @@ from pathlib import Path
 
 import numpy as np
 
-from dynamic_drone_routing.simulator_ddrp import Fleet, Instance, Order
+from dynamic_drone_routing.given.simulator_ddrp import Fleet, Instance, Order
 
-DEFAULT_INSTANCES_DIR = Path(__file__).resolve().parent / "instances"
+DEFAULT_INSTANCES_DIR = Path(__file__).resolve().parent.parent / "instances"
 WORKDAY = 480.0  # minutes
 
 

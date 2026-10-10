@@ -24,7 +24,7 @@ the random search in ``random_search_ddrp.py``.
 
 Run the demo with (from the repository root)::
 
-    uv run python -m dynamic_drone_routing.simulator_ddrp \
+    uv run python -m dynamic_drone_routing.given.simulator_ddrp \
         --instance dynamic_drone_routing/instances/toy.json
 """
 
@@ -40,7 +40,7 @@ from pathlib import Path
 import simpy
 
 UNSERVED_PENALTY = 1000.0  # objective penalty per order left unserved
-DEFAULT_INSTANCES_DIR = Path(__file__).resolve().parent / "instances"
+DEFAULT_INSTANCES_DIR = Path(__file__).resolve().parent.parent / "instances"
 
 
 # =============================================================================

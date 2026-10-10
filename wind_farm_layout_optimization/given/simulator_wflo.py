@@ -17,7 +17,7 @@ Coordinate system
 
 Typical use::
 
-    from wind_farm_layout_optimization.simulator_wflo import WindFarmEnvironment
+    from wind_farm_layout_optimization.given.simulator_wflo import WindFarmEnvironment
 
     env = WindFarmEnvironment.from_file("wind_farm_layout_optimization/instances/toy.json")
     layout = env.random_layout(seed=0)
@@ -329,7 +329,7 @@ def main(argv: list[str] | None = None) -> None:
     parser.add_argument(
         "--instance",
         type=Path,
-        default=Path(__file__).resolve().parent / "instances" / "toy.json",
+        default=Path(__file__).resolve().parent.parent / "instances" / "toy.json",
         help="instance JSON produced by generate_instances_wflo.py",
     )
     parser.add_argument("--seed", type=int, default=0, help="random seed for the demo layout")

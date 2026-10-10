@@ -6,11 +6,11 @@ and the wind **wake cones** (simplified Jensen model).
 
 Run it with (from the repository root)::
 
-    uv run streamlit run wind_farm_layout_optimization/app_wflo.py
+    uv run streamlit run wind_farm_layout_optimization/given/app_wflo.py
 
 or, from inside this folder::
 
-    uv run streamlit run app_wflo.py
+    uv run streamlit run given/app_wflo.py
 """
 
 from __future__ import annotations
@@ -23,7 +23,7 @@ import matplotlib
 
 matplotlib.use("Agg")
 
-ROOT = Path(__file__).resolve().parent.parent
+ROOT = Path(__file__).resolve().parents[2]  # repository root
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
@@ -32,23 +32,16 @@ import numpy as np  # noqa: E402
 import streamlit as st  # noqa: E402
 from matplotlib.patches import Polygon as MplPolygon  # noqa: E402
 
-from wind_farm_layout_optimization.simulator_wflo import (  # noqa: E402
+from wind_farm_layout_optimization.given.simulator_wflo import (  # noqa: E402
     WindFarmEnvironment,
     polygon_bounds,
 )
 from wind_farm_layout_optimization.student_wflo import run_solver_script  # noqa: E402
 
-FOLDER = Path(__file__).resolve().parent
+FOLDER = Path(__file__).resolve().parents[1]  # the problem folder (student files)
 INSTANCES_DIR = FOLDER / "instances"
-# Files that are *not* selectable solvers.
-NON_SOLVER_FILES = {
-    "__init__.py",
-    "simulator_wflo.py",
-    "generate_instances_wflo.py",
-    "app_wflo.py",
-    "ingestion.py",
-    "score.py",
-}
+# Root-level files that are *not* selectable solvers.
+NON_SOLVER_FILES = {"__init__.py"}
 
 st.set_page_config(page_title="WFLO Studio — MetaLab Suite", page_icon="🌀", layout="wide")
 
@@ -60,7 +53,7 @@ def list_instances() -> list[Path]:
     files = sorted(INSTANCES_DIR.glob("*.json"))
     if not files:
         with st.spinner("No instances found — generating the defaults…"):
-            from wind_farm_layout_optimization.generate_instances_wflo import main as gen
+            from wind_farm_layout_optimization.given.generate_instances_wflo import main as gen
 
             gen([])
         files = sorted(INSTANCES_DIR.glob("*.json"))

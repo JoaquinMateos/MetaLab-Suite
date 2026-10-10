@@ -22,7 +22,7 @@ Codabench invocation (positional arguments)::
 
 Local test (after running ``ingestion.py``)::
 
-    uv run python -m wind_farm_layout_optimization.score /tmp/wflo_out /tmp/wflo_scores
+    uv run python -m wind_farm_layout_optimization.autograder.score /tmp/wflo_out /tmp/wflo_scores
 """
 
 from __future__ import annotations

@@ -33,7 +33,7 @@ from abc import ABC, abstractmethod
 from collections.abc import Callable
 from pathlib import Path
 
-from dynamic_drone_routing.simulator_ddrp import (
+from dynamic_drone_routing.given.simulator_ddrp import (
     Instance,
     ReoptState,
     SimulationEnvironment,

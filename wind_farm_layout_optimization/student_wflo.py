@@ -38,7 +38,7 @@ from pathlib import Path
 
 import numpy as np
 
-from wind_farm_layout_optimization.simulator_wflo import WindFarmEnvironment
+from wind_farm_layout_optimization.given.simulator_wflo import WindFarmEnvironment
 
 ROOT = Path(__file__).resolve().parent.parent  # repository root
 

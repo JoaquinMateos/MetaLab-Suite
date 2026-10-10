@@ -8,10 +8,10 @@ physics, objective and constraints) is in the companion document
 [`../docs/wind_farm_layout_optimization.pdf`](../docs/wind_farm_layout_optimization.pdf);
 **this README is the technical guide** for running everything.
 
-> **You are given the simulator, the generator, a GUI, a random-search example
-> and a skeleton.** Your job is to implement the metaheuristic in
-> `student_wflo.py`. The random search is the *only* algorithm provided — every
-> other method is yours to design.
+> **The root of this folder contains only what you need:** your skeleton, the
+> random-search example, the data and this README. Everything provided is under
+> `given/`, and the autograder under `autograder/`. The random search is the
+> *only* algorithm given — every other method is yours to design.
 
 ---
 
@@ -27,33 +27,26 @@ formulation.
 
 ---
 
-## 2. Files
+## 2. Folder structure
 
 ```
 wind_farm_layout_optimization/
-├── simulator_wflo.py           # GIVEN — WindFarmEnvironment (the ground truth)
-├── generate_instances_wflo.py  # GIVEN — builds the 'toy' and 'hard' instances
-├── app_wflo.py                 # GIVEN — Streamlit GUI (run + visualise)
-├── random_search_wflo.py       # GIVEN — the ONLY algorithm (a random search)
-├── student_wflo.py             # YOUR FILE — OOP skeleton (BaseWFLOSolver + MySolver)
-├── ingestion.py                # BACKEND — Codabench ingestion program
-├── score.py                    # BACKEND — Codabench scoring program
-├── README.md                   # this technical guide
-├── instances/                  # generated instances: toy.json, hard.json
-└── solutions/                  # where your solver writes layouts
+├── README.md                     # this guide
+├── student_wflo.py               # ✏️ YOUR skeleton (OOP: BaseWFLOSolver + MySolver)
+├── random_search_wflo.py         # the ONLY algorithm given (a random search)
+├── instances/                    # toy.json, hard.json
+├── solutions/                    # where your solver writes layouts
+├── given/                        # provided tools — read, do not edit
+│   ├── simulator_wflo.py         #   WindFarmEnvironment (Jensen wake physics)
+│   ├── generate_instances_wflo.py#   builds the toy/hard instances
+│   └── app_wflo.py               #   Streamlit GUI
+└── autograder/
+    ├── ingestion.py              # Codabench ingestion (timeout + constraints)
+    └── score.py                  # Codabench scoring
 ```
 
-| File | Role |
-| --- | --- |
-| `simulator_wflo.py` | `WindFarmEnvironment`: Jensen wake physics, power, feasibility |
-| `generate_instances_wflo.py` | CLI that writes `instances/toy.json` and `instances/hard.json` |
-| `app_wflo.py` | Streamlit GUI: run a solver and draw the layout + wake cones |
-| `random_search_wflo.py` | The only algorithm given: `RandomSearchSolver(BaseWFLOSolver)` |
-| `student_wflo.py` | **Your file**: `BaseWFLOSolver` interface + `MySolver` skeleton |
-| `ingestion.py`, `score.py` | Autograder backend (strict timeout, constraints, scoring) |
-
 All commands are run **from the repository root**, after `uv sync` (the GUI can
-also be launched from inside this folder — see §3.3).
+also be run from inside this folder — see §3.3).
 
 ---
 
@@ -62,8 +55,8 @@ also be launched from inside this folder — see §3.3).
 ### 3.1 Generate the instances
 
 ```bash
-uv run python -m wind_farm_layout_optimization.generate_instances_wflo --name all
-uv run python -m wind_farm_layout_optimization.generate_instances_wflo --name hard --seed 42
+uv run python -m wind_farm_layout_optimization.given.generate_instances_wflo --name all
+uv run python -m wind_farm_layout_optimization.given.generate_instances_wflo --name hard --seed 42
 ```
 
 | Flag | Default | Meaning |
@@ -75,7 +68,7 @@ uv run python -m wind_farm_layout_optimization.generate_instances_wflo --name ha
 ### 3.2 Inspect a random layout (simulator demo)
 
 ```bash
-uv run python -m wind_farm_layout_optimization.simulator_wflo \
+uv run python -m wind_farm_layout_optimization.given.simulator_wflo \
     --instance wind_farm_layout_optimization/instances/toy.json --seed 0
 ```
 
@@ -84,16 +77,16 @@ uv run python -m wind_farm_layout_optimization.simulator_wflo \
 Load a JSON instance, pick a solver script, run it under a time limit, and see
 the terrain, the exclusion zones, the turbines and the **wind wake cones**.
 
-From **inside this folder** (exactly as requested):
+From **inside this folder**:
 
 ```bash
-uv run streamlit run app_wflo.py
+uv run streamlit run given/app_wflo.py
 ```
 
 or from the **repository root**:
 
 ```bash
-uv run streamlit run wind_farm_layout_optimization/app_wflo.py
+uv run streamlit run wind_farm_layout_optimization/given/app_wflo.py
 ```
 
 Streamlit prints a local URL (default <http://localhost:8501>). Pick an
@@ -152,22 +145,22 @@ Until you implement `solve`, the command prints a friendly reminder.
 
 ## 5. Autograder (Codabench backend)
 
-* **`ingestion.py`** runs the submitted solver on every instance, in a
-  subprocess under a **strict CPU + wall timeout**, then verifies the physical
+* **`autograder/ingestion.py`** runs the submitted solver on every instance, in
+  a subprocess under a **strict CPU + wall timeout**, then verifies the physical
   constraints (*no overlapping turbines*, inside terrain, outside exclusions)
   and evaluates the expected power. It writes `predictions.json`.
-* **`score.py`** reads those predictions and writes `scores.json`. An
+* **`autograder/score.py`** reads those predictions and writes `scores.json`. An
   **infeasible** layout scores **0**; otherwise the per-instance score is
   `min(1, expected_power / reference_power)` and the final score is the mean.
 
 Local run (from the repository root):
 
 ```bash
-uv run python -m wind_farm_layout_optimization.ingestion \
+uv run python -m wind_farm_layout_optimization.autograder.ingestion \
     wind_farm_layout_optimization /tmp/wflo_out \
     wind_farm_layout_optimization/random_search_wflo.py --time-limit 60
 
-uv run python -m wind_farm_layout_optimization.score /tmp/wflo_out /tmp/wflo_scores
+uv run python -m wind_farm_layout_optimization.autograder.score /tmp/wflo_out /tmp/wflo_scores
 ```
 
 On Codabench the programs are invoked positionally as

@@ -9,10 +9,10 @@ battery constraints, the rolling-horizon idea) is in the companion document
 **this README is the technical guide** to the simulation, the GUI and the
 autograder.
 
-> **You are given the simulator, the generator, a GUI, a random-search example
-> and a skeleton.** Your job is to implement the dispatch policy in
-> `student_ddrp.py`. The random search is the *only* algorithm provided — every
-> other policy is yours to design.
+> **The root of this folder contains only what you need:** your skeleton, the
+> random-search example, the data and this README. Everything provided is under
+> `given/`, and the autograder under `autograder/`. The random search is the
+> *only* algorithm given — every other policy is yours to design.
 
 ---
 
@@ -32,7 +32,7 @@ and in what order**, minimising `Distance + 1000 x Unserved + 10 x Swaps`.
 
 ## 2. Simulation architecture
 
-The engine is in `simulator_ddrp.py` and is built on
+The engine is in `given/simulator_ddrp.py` and is built on
 [**SimPy**](https://simpy.readthedocs.io/), a process-based discrete-event
 simulator. The dispatch policy is **pluggable**: you pass a callable
 `reoptimize(state) -> {drone_id: [order_id, ...]}`.
@@ -67,33 +67,27 @@ simulator. The dispatch policy is **pluggable**: you pass a callable
 5. **End.** The simulation runs until the `workday` horizon and returns a report
    (served / unserved, distance, swaps, re-optimisations, makespan, validity).
 
-```
-t=0    release static orders ──► reoptimize() ──► dispatch idle drones
- ...    drones fly, deliver, return, swap battery
-t1>0   dynamic order arrives ──► PAUSE ──► reoptimize() ──► RESUME
-t=480  workday ends ──► report()
-```
-
 A route is feasible when its **round trip** (depot → stops → depot) fits within
 `max_range` and its **total payload** is within `capacity`.
 
 ---
 
-## 3. Files
+## 3. Folder structure
 
 ```
 dynamic_drone_routing/
-├── __init__.py                    # package marker
-├── simulator_ddrp.py              # GIVEN — SimPy engine
-├── generate_instances_ddrp.py     # GIVEN — builds the 'toy' and 'hard' workdays
-├── app_ddrp.py                    # GIVEN — Streamlit visualiser
-├── random_search_ddrp.py          # GIVEN — the ONLY algorithm (a random search)
-├── student_ddrp.py                # YOUR FILE — OOP skeleton (BaseSolver + MySolver)
-├── ingestion.py                   # BACKEND — Codabench ingestion (per-event CPU timeout)
-├── score.py                       # BACKEND — Codabench scoring
-├── README.md                      # this technical guide
-├── instances/                     # generated workdays: toy.json, hard.json
-└── solutions/                     # solver outputs
+├── README.md                     # this guide
+├── student_ddrp.py               # ✏️ YOUR skeleton (OOP: BaseSolver + MySolver)
+├── random_search_ddrp.py         # the ONLY algorithm given (a random search)
+├── instances/                    # toy.json, hard.json
+├── solutions/                    # solver outputs
+├── given/                        # provided tools — read, do not edit
+│   ├── simulator_ddrp.py         #   SimPy engine
+│   ├── generate_instances_ddrp.py#   builds the toy/hard workdays
+│   └── app_ddrp.py               #   Streamlit GUI
+└── autograder/
+    ├── ingestion.py              # per-event CPU timeout + validation
+    └── score.py                  # scoring
 ```
 
 ---
@@ -101,13 +95,13 @@ dynamic_drone_routing/
 ## 4. Commands
 
 All commands are run **from the repository root**, after `uv sync` (the GUI can
-also be launched from inside this folder — see §4.3).
+also be run from inside this folder — see §4.3).
 
 ### 4.1 Generate the workdays
 
 ```bash
-uv run python -m dynamic_drone_routing.generate_instances_ddrp --name all
-uv run python -m dynamic_drone_routing.generate_instances_ddrp --name hard --seed 42
+uv run python -m dynamic_drone_routing.given.generate_instances_ddrp --name all
+uv run python -m dynamic_drone_routing.given.generate_instances_ddrp --name hard --seed 42
 ```
 
 | Flag | Default | Meaning |
@@ -123,7 +117,7 @@ uv run python -m dynamic_drone_routing.generate_instances_ddrp --name hard --see
 ### 4.2 Run the simulator
 
 ```bash
-uv run python -m dynamic_drone_routing.simulator_ddrp \
+uv run python -m dynamic_drone_routing.given.simulator_ddrp \
     --instance dynamic_drone_routing/instances/toy.json
 ```
 
@@ -135,16 +129,16 @@ uv run python -m dynamic_drone_routing.simulator_ddrp \
 Run the SimPy engine and inspect the day **in bulk** or **step by step** (a
 timeline slider), with the depot, orders, drone paths and the drones themselves.
 
-From **inside this folder** (exactly as requested):
+From **inside this folder**:
 
 ```bash
-uv run streamlit run app_ddrp.py
+uv run streamlit run given/app_ddrp.py
 ```
 
 or from the **repository root**:
 
 ```bash
-uv run streamlit run dynamic_drone_routing/app_ddrp.py
+uv run streamlit run dynamic_drone_routing/given/app_ddrp.py
 ```
 
 Streamlit prints a local URL (default <http://localhost:8501>). Pick a workday
@@ -185,7 +179,7 @@ uv run python -m dynamic_drone_routing.random_search_ddrp \
 To use **your own** policy in the simulator:
 
 ```python
-from dynamic_drone_routing.simulator_ddrp import Instance, SimulationEnvironment
+from dynamic_drone_routing.given.simulator_ddrp import Instance, SimulationEnvironment
 from dynamic_drone_routing.student_ddrp import MySolver
 
 instance = Instance.load("dynamic_drone_routing/instances/toy.json")
@@ -198,22 +192,24 @@ print(report["objective"], report["valid"])
 
 ## 5. Autograder (Codabench backend)
 
-* **`ingestion.py`** runs the submitted policy inside the SimPy engine with a
-  **strict CPU timeout per dynamic event** (`--per-event-cpu`, enforced with
-  `signal.setitimer(ITIMER_PROF)`), plus a total wall budget (`--total-wall`).
-  Any timeout, crash or physical violation marks the instance **invalid**.
-* **`score.py`** validates battery life relentlessly and scores each valid plan
-  as `Distance + 1000 x Unserved + 10 x Swaps`; invalid plans are charged a huge
-  penalty. The reported score is the **sum over instances** (lower is better).
+* **`autograder/ingestion.py`** runs the submitted policy inside the SimPy
+  engine with a **strict CPU timeout per dynamic event** (`--per-event-cpu`,
+  enforced with `signal.setitimer(ITIMER_PROF)`), plus a total wall budget
+  (`--total-wall`). Any timeout, crash or physical violation marks the instance
+  **invalid**.
+* **`autograder/score.py`** validates battery life relentlessly and scores each
+  valid plan as `Distance + 1000 x Unserved + 10 x Swaps`; invalid plans are
+  charged a huge penalty. The reported score is the **sum over instances**
+  (lower is better).
 
 Local run (from the repository root):
 
 ```bash
-uv run python -m dynamic_drone_routing.ingestion \
+uv run python -m dynamic_drone_routing.autograder.ingestion \
     dynamic_drone_routing /tmp/ddrp_out dynamic_drone_routing/random_search_ddrp.py \
     --per-event-cpu 2 --total-wall 60
 
-uv run python -m dynamic_drone_routing.score /tmp/ddrp_out /tmp/ddrp_scores
+uv run python -m dynamic_drone_routing.autograder.score /tmp/ddrp_out /tmp/ddrp_scores
 ```
 
 On Codabench the programs are invoked positionally as

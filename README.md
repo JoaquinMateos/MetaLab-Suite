@@ -84,11 +84,11 @@ cd MetaLab-Suite
 uv sync
 
 # 3. try the wind-farm assignment
-uv run python -m wind_farm_layout_optimization.generate_instances_wflo --name all
+uv run python -m wind_farm_layout_optimization.given.generate_instances_wflo --name all
 uv run python -m wind_farm_layout_optimization.random_search_wflo \
     --instance wind_farm_layout_optimization/instances/toy.json \
     --out wind_farm_layout_optimization/solutions/toy_random.json
-uv run streamlit run wind_farm_layout_optimization/app_wflo.py
+uv run streamlit run wind_farm_layout_optimization/given/app_wflo.py
 ```
 
 Add `--group dev` to be explicit about the development tools (pytest, ruff,
@@ -114,41 +114,40 @@ MetaLab Suite/
 │       ├── __init__.py
 │       └── trace.py               # ConvergenceTrace (convergence curves)
 ├── wind_farm_layout_optimization/ # Problem #1 — student assignment
-│   ├── simulator_wflo.py          # GIVEN: WindFarmEnvironment (Jensen wakes)
-│   ├── generate_instances_wflo.py # GIVEN: builds toy + hard instances
-│   ├── app_wflo.py                # GIVEN: Streamlit GUI (run solver + wake cones)
-│   ├── random_search_wflo.py      # GIVEN: the ONLY algorithm (random search)
 │   ├── student_wflo.py            # YOUR FILE: OOP skeleton (BaseWFLOSolver + MySolver)
-│   ├── ingestion.py  score.py     # BACKEND: Codabench autograder
-│   ├── README.md                  # technical execution guide
-│   ├── instances/                 # generated data (git-ignored)
-│   └── solutions/                 # your solver output (git-ignored)
+│   ├── random_search_wflo.py      # the ONLY algorithm given (random search)
+│   ├── instances/  solutions/     # data / your outputs (git-ignored)
+│   ├── given/                     # provided — do not edit
+│   │   ├── simulator_wflo.py      #   WindFarmEnvironment (Jensen wakes)
+│   │   ├── generate_instances_wflo.py
+│   │   └── app_wflo.py            #   Streamlit GUI
+│   └── autograder/                # Codabench ingestion.py + score.py
 └── dynamic_drone_routing/         # Problem #2 — SimPy simulation assignment
-    ├── simulator_ddrp.py          # GIVEN: SimPy engine
-    ├── generate_instances_ddrp.py # GIVEN: builds toy + hard workdays
-    ├── app_ddrp.py                # GIVEN: Streamlit visualiser (timeline)
-    ├── random_search_ddrp.py      # GIVEN: the ONLY algorithm (random search)
     ├── student_ddrp.py            # YOUR FILE: OOP skeleton (BaseSolver + MySolver)
-    ├── ingestion.py  score.py     # BACKEND: Codabench autograder
-    ├── README.md                  # technical execution guide
-    ├── instances/                 # generated workdays (git-ignored)
-    └── solutions/                 # solver outputs (git-ignored)
+    ├── random_search_ddrp.py      # the ONLY algorithm given (random search)
+    ├── instances/  solutions/     # data / your outputs (git-ignored)
+    ├── given/                     # provided — do not edit
+    │   ├── simulator_ddrp.py      #   SimPy engine
+    │   ├── generate_instances_ddrp.py
+    │   └── app_ddrp.py            #   Streamlit visualiser
+    └── autograder/                # Codabench ingestion.py + score.py
 ```
 
 ### Anatomy of a problem folder
 
-Both problems follow a **“given vs. yours”** split: only the physics/simulation,
-the GUI, a random-search example and a skeleton are given; the solver is the
-deliverable.
+Both problems follow a **“given vs. yours”** split and keep the folder root clean:
+only *your* file, the random-search example, the data and the README live there;
+the provided tools and the autograder are tucked into subfolders.
 
-| File | Purpose |
+| Path | Purpose |
 | --- | --- |
-| `simulator_<problem>.py` | Given: the objective / simulation (the "ground truth") |
-| `generate_instances_<problem>.py` | Given: builds the `toy` and `hard` instances |
-| `app_<problem>.py` | Given: Streamlit GUI |
-| `random_search_<problem>.py` | Given: the **only** algorithm (random search, OOP) |
 | `student_<problem>.py` | **Your file**: OOP skeleton (abstract base + `MySolver`) |
-| `ingestion.py` / `score.py` | Backend: Codabench autograder |
+| `random_search_<problem>.py` | The **only** algorithm given (random search, OOP) |
+| `instances/`, `solutions/` | Data and your outputs |
+| `given/simulator_<problem>.py` | Provided: the objective / simulation (the "ground truth") |
+| `given/generate_instances_<problem>.py` | Provided: builds the `toy` and `hard` instances |
+| `given/app_<problem>.py` | Provided: Streamlit GUI |
+| `autograder/ingestion.py`, `autograder/score.py` | Backend: Codabench autograder |
 | `README.md` | Technical guide (referenced by the problem's PDF) |
 
 ---

@@ -19,7 +19,7 @@ import math
 
 import numpy as np
 
-from dynamic_drone_routing.simulator_ddrp import ReoptState
+from dynamic_drone_routing.given.simulator_ddrp import ReoptState
 from dynamic_drone_routing.student_ddrp import BaseSolver, run_cli
 
 

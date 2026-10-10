@@ -16,8 +16,9 @@ Codabench invocation (positional arguments)::
 
 Local test (from the repository root)::
 
-    uv run python -m wind_farm_layout_optimization.ingestion \
-        wind_farm_layout_optimization /tmp/wflo_out wind_farm_layout_optimization/student_wflo.py
+    uv run python -m wind_farm_layout_optimization.autograder.ingestion \
+        wind_farm_layout_optimization /tmp/wflo_out \
+        wind_farm_layout_optimization/random_search_wflo.py
 """
 
 from __future__ import annotations
@@ -26,7 +27,7 @@ import argparse
 import json
 from pathlib import Path
 
-from wind_farm_layout_optimization.simulator_wflo import WindFarmEnvironment
+from wind_farm_layout_optimization.given.simulator_wflo import WindFarmEnvironment
 from wind_farm_layout_optimization.student_wflo import run_solver_script
 
 

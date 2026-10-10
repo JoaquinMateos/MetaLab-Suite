@@ -7,11 +7,11 @@ dynamic orders as they appear), the drone paths and the drones' positions.
 
 Run it with (from the repository root)::
 
-    uv run streamlit run dynamic_drone_routing/app_ddrp.py
+    uv run streamlit run dynamic_drone_routing/given/app_ddrp.py
 
 or, from inside this folder::
 
-    uv run streamlit run app_ddrp.py
+    uv run streamlit run given/app_ddrp.py
 """
 
 from __future__ import annotations
@@ -27,7 +27,7 @@ import matplotlib
 
 matplotlib.use("Agg")
 
-ROOT = Path(__file__).resolve().parent.parent
+ROOT = Path(__file__).resolve().parents[2]  # repository root
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
@@ -35,16 +35,9 @@ import matplotlib.pyplot as plt  # noqa: E402
 import streamlit as st  # noqa: E402
 from matplotlib.lines import Line2D  # noqa: E402
 
-FOLDER = Path(__file__).resolve().parent
+FOLDER = Path(__file__).resolve().parents[1]  # the problem folder (student files)
 INSTANCES_DIR = FOLDER / "instances"
-NON_SOLVER_FILES = {
-    "__init__.py",
-    "simulator_ddrp.py",
-    "generate_instances_ddrp.py",
-    "app_ddrp.py",
-    "ingestion.py",
-    "score.py",
-}
+NON_SOLVER_FILES = {"__init__.py"}
 PALETTE = ["#1f77b4", "#ff7f0e", "#2ca02c", "#d62728", "#9467bd", "#8c564b",
            "#e377c2", "#17becf", "#bcbd22", "#7f7f7f"]
 
@@ -58,7 +51,7 @@ def list_instances() -> list[Path]:
     files = sorted(INSTANCES_DIR.glob("*.json"))
     if not files:
         with st.spinner("No instances found — generating the defaults…"):
-            from dynamic_drone_routing.generate_instances_ddrp import main as gen
+            from dynamic_drone_routing.given.generate_instances_ddrp import main as gen
 
             gen([])
         files = sorted(INSTANCES_DIR.glob("*.json"))
