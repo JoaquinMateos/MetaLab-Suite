@@ -16,6 +16,7 @@ or, from inside this folder::
 
 from __future__ import annotations
 
+import io
 import json
 import math
 import os
@@ -54,7 +55,7 @@ C_DELIVERED = "#16a34a"
 C_HIDDEN = "#cbd5e1"
 DEPOT_COLOR = "#334155"
 
-st.set_page_config(page_title="DDRP Studio — MetaLab Suite", page_icon="🚁", layout="wide")
+st.set_page_config(page_title="DDRP Studio — MetaLab Suite", layout="wide")
 
 
 # ---------------------------------------------------------------------------
@@ -232,7 +233,11 @@ def figure_run(data: dict, t: float, show_full_paths: bool,
     span = max(max(xs) - min(xs), max(ys) - min(ys)) or 1.0
     pad = 0.08 * span
 
-    fig, ax = plt.subplots(figsize=(10, 7.6))
+    # Size the figure to the data so the map fills it (minimal whitespace).
+    aspect = ((max(xs) - min(xs)) or 1.0) / ((max(ys) - min(ys)) or 1.0)
+    fig_h = 6.6
+    fig_w = min(12.0, max(6.0, fig_h * aspect))
+    fig, ax = plt.subplots(figsize=(fig_w, fig_h))
     fig.patch.set_facecolor("#ffffff")
     ax.set_facecolor("#f8fafc")
 
@@ -316,6 +321,22 @@ def figure_run(data: dict, t: float, show_full_paths: bool,
     return fig
 
 
+def figure_png(fig: plt.Figure, dpi: int = 115) -> bytes:
+    """Render a figure to tightly-cropped PNG bytes (so it fits the viewport)."""
+    buffer = io.BytesIO()
+    fig.savefig(buffer, format="png", dpi=dpi, bbox_inches="tight", pad_inches=0.12)
+    plt.close(fig)
+    return buffer.getvalue()
+
+
+def display_width(data: dict, max_height: int = 540, max_width: int = 1040) -> int:
+    """A pixel width that keeps the map's height below ``max_height``."""
+    xs = [data["depot"][0], *[o["x"] for o in data["orders"]]]
+    ys = [data["depot"][1], *[o["y"] for o in data["orders"]]]
+    aspect = ((max(xs) - min(xs)) or 1.0) / ((max(ys) - min(ys)) or 1.0)
+    return int(min(max_width, max(380, max_height * aspect)))
+
+
 # ---------------------------------------------------------------------------
 # Sidebar
 # ---------------------------------------------------------------------------
@@ -340,7 +361,7 @@ run = st.sidebar.button("Run simulation", type="primary")
 # ---------------------------------------------------------------------------
 # Main panel
 # ---------------------------------------------------------------------------
-st.title("🚁 DDRP Studio")
+st.title("DDRP Studio")
 st.caption(
     "Run the SimPy engine on a workday and inspect the drone routes. Dynamic "
     "orders light up as they appear over the timeline."
@@ -386,6 +407,8 @@ else:
         )
 
     st.sidebar.header("View")
+    size = st.sidebar.radio("Map size", ["Small", "Medium", "Large"], index=1, horizontal=True)
+    max_h = {"Small": 400, "Medium": 520, "Large": 700}[size]
     mode = st.sidebar.radio("Mode", ["Step-by-step", "Bulk (final)"])
     events = data.get("events", [])
     step_times = sorted({0.0, *[float(e["t"]) for e in events], workday})
@@ -398,23 +421,23 @@ else:
     else:
         st.session_state["step"] = min(int(st.session_state.get("step", 0)), n_steps - 1)
         b1, b2, b3, b4 = st.sidebar.columns(4)
-        if b1.button("⏮", help="First step"):
+        if b1.button("First", help="First step"):
             st.session_state["step"] = 0
             st.rerun()
-        if b2.button("◀", help="Previous step"):
+        if b2.button("Prev", help="Previous step"):
             st.session_state["step"] = max(0, st.session_state["step"] - 1)
             st.rerun()
-        if b3.button("▶", help="Next step"):
+        if b3.button("Next", help="Next step"):
             st.session_state["step"] = min(n_steps - 1, st.session_state["step"] + 1)
             st.rerun()
-        if b4.button("⏭", help="Last step"):
+        if b4.button("Last", help="Last step"):
             st.session_state["step"] = n_steps - 1
             st.rerun()
 
         step = st.sidebar.slider("Step (by event)", 0, n_steps - 1, key="step")
         t = step_times[step]
         show_full = st.sidebar.checkbox("Also show full paths", value=False)
-        play = st.sidebar.button("▶ Play")
+        play = st.sidebar.button("Play", help="Play the whole workday")
         speed = st.sidebar.slider("Play speed (s/frame)", 0.05, 1.0, 0.2, 0.05)
         here = ", ".join(e["event"] for e in events if abs(float(e["t"]) - t) < 1e-9)
         st.sidebar.caption(f"Step {step + 1} / {n_steps} · t = {t:.0f} min · {here or 'start'}")
@@ -432,12 +455,15 @@ else:
 
     if play:
         frame = st.empty()
+        width = display_width(data, max_height=max_h)
         for moment in step_times[step:]:
-            frame.pyplot(figure_run(data, moment, show_full, workday=workday), clear_figure=True)
+            figure = figure_run(data, moment, show_full, workday=workday)
+            frame.image(figure_png(figure), width=width)
             time.sleep(float(speed))
         st.session_state["step"] = n_steps - 1
     else:
-        st.pyplot(figure_run(data, t, show_full, workday=workday), clear_figure=True)
+        st.image(figure_png(figure_run(data, t, show_full, workday=workday)),
+                 width=display_width(data, max_height=max_h))
 
     left, right = st.columns([3, 2])
     with left, st.expander("Event feed", expanded=True):

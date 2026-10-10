@@ -1,4 +1,4 @@
-# 🧪 MetaLab Suite
+# MetaLab Suite
 
 > An educational suite of **trajectory-based metaheuristic** problems — each one
 > a self-contained folder with a simulator, a baseline solver, an instance
@@ -175,7 +175,7 @@ uv run pytest           # run the test suite
 
 ---
 
-## The README rule 📌
+## The README rule
 
 > **Whenever a problem folder is finished, it gets a comprehensive `README.md`
 > documenting (1) the problem context, (2) the folder structure, and (3) the
@@ -188,4 +188,4 @@ This keeps every problem self-explanatory and the suite consistent.
 
 ## License
 
-Released under the [MIT License](LICENSE) © 2026 Joaquin Mateos.
+Released under the [MIT License](LICENSE) (Copyright 2026 Joaquin Mateos).

@@ -1,4 +1,4 @@
-# 🚁 Dynamic Drone Routing Problem (DDRP)
+# Dynamic Drone Routing Problem (DDRP)
 
 > **MetaLab Suite · Problem #2 · SimPy simulation assignment**
 > Dispatch a drone fleet against orders that arrive during the day.
@@ -77,7 +77,7 @@ A route is feasible when its **round trip** (depot → stops → depot) fits wit
 ```
 dynamic_drone_routing/
 ├── README.md                     # this guide
-├── student_ddrp.py               # ✏️ YOUR skeleton (OOP: BaseSolver + MySolver)
+├── student_ddrp.py               # YOUR skeleton (OOP: BaseSolver + MySolver)
 ├── random_search_ddrp.py         # the ONLY algorithm given (a random search)
 ├── instances/                    # toy.json, hard.json
 ├── solutions/                    # solver outputs
@@ -124,7 +124,7 @@ uv run python -m dynamic_drone_routing.given.simulator_ddrp \
 (The simulator demo uses the random-search policy; with your own policy, see
 §4.5.)
 
-### 4.3 Local GUI (Streamlit) 🚁
+### 4.3 Local GUI (Streamlit)
 
 Run the SimPy engine and inspect the day **in bulk** or **step by step** (a
 timeline slider), with the depot, orders, drone paths and the drones themselves.

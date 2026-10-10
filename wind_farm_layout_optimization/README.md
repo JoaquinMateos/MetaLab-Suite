@@ -1,4 +1,4 @@
-# 🌀 Wind Farm Layout Optimization — Assignment
+# Wind Farm Layout Optimization — Assignment
 
 > **MetaLab Suite · Problem #1 · student assignment**
 > Place turbines to maximise expected power while mitigating the wake effect.
@@ -32,7 +32,7 @@ formulation.
 ```
 wind_farm_layout_optimization/
 ├── README.md                     # this guide
-├── student_wflo.py               # ✏️ YOUR skeleton (OOP: BaseWFLOSolver + MySolver)
+├── student_wflo.py               # YOUR skeleton (OOP: BaseWFLOSolver + MySolver)
 ├── random_search_wflo.py         # the ONLY algorithm given (a random search)
 ├── instances/                    # toy.json, hard.json
 ├── solutions/                    # where your solver writes layouts
@@ -72,7 +72,7 @@ uv run python -m wind_farm_layout_optimization.given.simulator_wflo \
     --instance wind_farm_layout_optimization/instances/toy.json --seed 0
 ```
 
-### 3.3 Local GUI (Streamlit) 🌀
+### 3.3 Local GUI (Streamlit)
 
 Load a JSON instance, pick a solver script, run it under a time limit, and see
 the terrain, the exclusion zones, the turbines and the **wind wake cones**.

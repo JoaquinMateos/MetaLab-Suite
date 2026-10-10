@@ -43,7 +43,7 @@ INSTANCES_DIR = FOLDER / "instances"
 # Root-level files that are *not* selectable solvers.
 NON_SOLVER_FILES = {"__init__.py"}
 
-st.set_page_config(page_title="WFLO Studio — MetaLab Suite", page_icon="🌀", layout="wide")
+st.set_page_config(page_title="WFLO Studio — MetaLab Suite", layout="wide")
 
 
 # ---------------------------------------------------------------------------
@@ -178,7 +178,7 @@ run = st.sidebar.button("Run solver", type="primary")
 # ---------------------------------------------------------------------------
 # Main panel
 # ---------------------------------------------------------------------------
-st.title("🌀 WFLO Studio")
+st.title("WFLO Studio")
 st.caption(
     "Load an instance, pick a solver script, run it under a time limit, and "
     "inspect the layout together with the Jensen wake cones."
