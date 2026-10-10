@@ -144,6 +144,10 @@ uv run streamlit run dynamic_drone_routing/given/app_ddrp.py
 Streamlit prints a local URL (default <http://localhost:8501>). Pick a workday
 and a policy, press **Run simulation**, then scrub the timeline: **dynamic
 orders light up as they appear** (grey → orange) and turn green once delivered.
+The map draws **vector icons** (oriented quadcopters, a warehouse depot, parcels)
+plus a **battery ring** per drone; drop real PNGs named `drone.png`, `depot.png`
+and `package.png` into [`given/assets/`](given/assets/README.md) to use artwork
+instead.
 
 ### 4.4 Your skeleton — object-oriented
 
